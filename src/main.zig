@@ -24,7 +24,7 @@ const State = struct {
     const Self = @This();
     fn init(rand: *const std.Random, allocator: std.mem.Allocator) !Self {
         var asteroids = std.ArrayList(Asteroid).init(allocator);
-        for (0..50) |_| {
+        for (0..10) |_| {
             const astroid = try Asteroid.init(
                 Vector2.init(
                     rand.float(f32) * Window.WIDTH,
@@ -52,10 +52,31 @@ var state: State = undefined;
 const Ship = struct {
     const SPEED = 32;
     const ROTATION_SPEED = math.tau;
+    const POINTS = .{
+        // Tip of ship
+        Vector2.init(0.0, -0.62),
+        // Left wing of ship
+        Vector2.init(-0.42, 0.62),
+        // Left sub-wing of ship
+        Vector2.init(-0.21, 0.48),
+        // Right sub-wing of ship
+        Vector2.init(0.21, 0.48),
+        // Right wing of ship
+        Vector2.init(0.42, 0.62),
+    };
+    const BOOSTER_POINTS = .{
+        // Left sub-wing of ship
+        Vector2.init(-0.21, 0.48),
+        // Bottom tip of booster
+        Vector2.init(0.0, 0.96),
+        // Right sub-wing of ship
+        Vector2.init(0.21, 0.48),
+    };
 
     position: Vector2,
     velocity: Vector2 = Vector2.init(0, 0),
     rotation: f32 = 0.0,
+    dead: bool = false,
 
     const Self = @This();
     fn init() Self {
@@ -78,23 +99,21 @@ const Ship = struct {
         return Vector2.init(math.cos(dir_angle), math.sin(dir_angle));
     }
 
+    fn drawn_points(self: *Self) std.BoundedArray(Vector2, 32) {
+        return get_drawn_points(
+            self.position,
+            Line.SCALE,
+            self.rotation,
+            &Ship.POINTS,
+        );
+    }
+
     fn draw(self: *Self, booster: bool) void {
         draw_lines(
             self.position,
             Line.SCALE,
             self.rotation,
-            &.{
-                // Tip of ship
-                Vector2.init(0.0, -0.62),
-                // Left wing of ship
-                Vector2.init(-0.42, 0.62),
-                // Left sub-wing of ship
-                Vector2.init(-0.21, 0.48),
-                // Right sub-wing of ship
-                Vector2.init(0.21, 0.48),
-                // Right wing of ship
-                Vector2.init(0.42, 0.62),
-            },
+            &Ship.POINTS,
         );
 
         if (booster) {
@@ -102,14 +121,7 @@ const Ship = struct {
                 self.position,
                 Line.SCALE,
                 self.rotation,
-                &.{
-                    // Left sub-wing of ship
-                    Vector2.init(-0.21, 0.48),
-                    // Bottom tip of booster
-                    Vector2.init(0.0, 0.96),
-                    // Right sub-wing of ship
-                    Vector2.init(0.21, 0.48),
-                },
+                &Ship.BOOSTER_POINTS,
             );
         }
     }
@@ -123,19 +135,11 @@ const Line = struct {
 const Asteroid = struct {
     size: AsteroidSize,
     position: Vector2,
-    seed: u64,
+    points: std.BoundedArray(Vector2, 16),
 
     const Self = @This();
     fn init(position: Vector2, size: AsteroidSize, seed: u64) !Self {
-        return Self{
-            .size = size,
-            .position = position,
-            .seed = seed,
-        };
-    }
-
-    fn draw(self: *const Self) void {
-        var rng = std.Random.DefaultPrng.init(self.seed);
+        var rng = std.Random.DefaultPrng.init(seed);
         var rand = rng.random();
 
         var points = std.BoundedArray(Vector2, 16).init(0) catch unreachable;
@@ -174,11 +178,28 @@ const Asteroid = struct {
             points.append(point) catch unreachable;
         }
 
+        return Self{
+            .size = size,
+            .position = position,
+            .points = points,
+        };
+    }
+
+    fn drawn_points(self: *Self) std.BoundedArray(Vector2, 32) {
+        return get_drawn_points(
+            self.position,
+            Line.SCALE * self.size.size(),
+            0.0,
+            self.points.slice(),
+        );
+    }
+
+    fn draw(self: *const Self) void {
         draw_lines(
             self.position,
             Line.SCALE * self.size.size(),
             0.0,
-            points.slice(),
+            self.points.slice(),
         );
     }
 };
@@ -205,6 +226,35 @@ const AsteroidSize = enum {
         };
     }
 };
+
+fn get_drawn_points(origin: Vector2, scale: f32, rotation: f32, points: []const Vector2) std.BoundedArray(Vector2, 32) {
+    var drawn_points = std.BoundedArray(Vector2, 32).init(0) catch |err| {
+        std.debug.print("get_drawn_points: failed to init drawn_points bounded array {any}", .{err});
+        return .{};
+    };
+
+    // Calculate actual points to be drawn on screen after transforms, etc
+    for (0..points.len) |i| {
+        const currPoint = points[i];
+        const currTransformed = transform(
+            origin,
+            scale,
+            rotation,
+            currPoint,
+        );
+        const currDrawn = Vector2.init(
+            currTransformed.x,
+            currTransformed.y,
+        );
+
+        drawn_points.append(currDrawn) catch |err| {
+            std.debug.print("get_drawn_points: failed to add drawing point to bounded array due to overflow {any}", .{err});
+            continue;
+        };
+    }
+
+    return drawn_points;
+}
 
 /// Draws a slice of points in relation to the provided `origin` and `scale
 fn draw_lines(origin: Vector2, scale: f32, rotation: f32, points: []const Vector2) void {
@@ -346,6 +396,8 @@ fn update() void {
         @mod(state.ship.position.y, Window.HEIGHT),
     );
 
+    const ship_drawn_points = state.ship.drawn_points();
+
     // ***** ASTEROIDS *****
 
     // Update asteroid positions
@@ -361,17 +413,32 @@ fn update() void {
             @mod(asteroid.position.x, Window.WIDTH),
             @mod(asteroid.position.y, Window.HEIGHT),
         );
+
+        // Handle asteroid vs ship collision
+        const asteroid_drawn_points = asteroid.drawn_points();
+        for (ship_drawn_points.slice()) |point| {
+            const ship_collision = rl.checkCollisionPointPoly(
+                point,
+                asteroid_drawn_points.slice(),
+            );
+            if (ship_collision) {
+                state.ship.dead = true;
+                break;
+            }
+        }
     }
 }
 
 const BOOSTER_TICK_RATE = 24.0;
 
 fn render() void {
-    // Draw ship
-    const moving = rl.isKeyDown(.w);
-    const booster_tick = @mod(@as(i32, @intFromFloat(state.now * BOOSTER_TICK_RATE)), 2) == 0;
-    const booster = moving and booster_tick;
-    state.ship.draw(booster);
+    if (state.ship.dead == false) {
+        // Draw ship
+        const moving = rl.isKeyDown(.w);
+        const booster_tick = @mod(@as(i32, @intFromFloat(state.now * BOOSTER_TICK_RATE)), 2) == 0;
+        const booster = moving and booster_tick;
+        state.ship.draw(booster);
+    }
 
     // Draw asteroids
     for (state.asteroids) |*asteroid| {
@@ -432,5 +499,6 @@ test "asteroids" {
             @as(f32, @floatFromInt(0)) * 50 + 50,
         ),
         .Medium,
+        @as(u64, @bitCast(std.time.timestamp())),
     );
 }
