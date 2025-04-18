@@ -4,48 +4,100 @@ const std = @import("std");
 // declaratively construct a build graph that will be executed by an external
 // runner.
 pub fn build(b: *std.Build) void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+    buildNative(b);
+}
 
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
+// for web builds, the Zig code needs to be built into a library and linked with the Emscripten linker
+// fn buildWeb(b: *std.Build, opts: std.Options) !void {
+// const lib = b.addStaticLibrary(.{
+//     .name = "pacman",
+//     .root_module = opts.mod,
+// });
+//
+// const raylib = opts.dep_raylib.module("raylib");
+// const raylib_artifact = opts.dep_raylib.artifact("raylib");
+// exe.linkLibrary(raylib_artifact);
+// exe.root_module.addImport("raylib", raylib);
+// lib.step.dependOn(&shd.step);
+
+// // create a build step which invokes the Emscripten linker
+// const emsdk = opts.dep_sokol.builder.dependency("emsdk", .{});
+// const link_step = try sokol.emLinkStep(b, .{
+//     .lib_main = lib,
+//     .target = opts.mod.resolved_target.?,
+//     .optimize = opts.mod.optimize.?,
+//     .emsdk = emsdk,
+//     .use_webgl2 = true,
+//     .use_emmalloc = true,
+//     .use_filesystem = false,
+//     .shell_file_path = opts.dep_sokol.path("src/sokol/web/shell.html"),
+// });
+// // attach Emscripten linker output to default install step
+// b.getInstallStep().dependOn(&link_step.step);
+// // ...and a special run step to start the web build output via 'emrun'
+// const run = sokol.emRunStep(b, .{ .name = "pacman", .emsdk = emsdk });
+// run.step.dependOn(&link_step.step);
+// b.step("run", "Run pacman").dependOn(&run.step);
+// }
+
+fn add_assets_option(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+    var options = b.addOptions();
+    var files = std.ArrayList([]const u8).init(b.allocator);
+    defer files.deinit();
+
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try std.fs.cwd().realpath("src/assets", buf[0..]);
+
+    var dir = try std.fs.openDirAbsolute(path, .{
+        .iterate = true,
+    });
+    var dir_iter = dir.iterate();
+    while (try dir_iter.next()) |file| {
+        if (file.kind != .file) {
+            continue;
+        }
+        try files.append(b.dupe(file.name));
+    }
+
+    options.addOption([]const []const u8, "files", files.items);
+    exe.step.dependOn(&options.step);
+
+    const assets = b.addModule("assets", .{
+        .root_source_file = options.getOutput(),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("assets", assets);
+}
+
+fn buildNative(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // This creates a "module", which represents a collection of source files alongside
-    // some compilation options, such as optimization mode and linked system libraries.
-    // Every executable or library we compile will be based on one or more modules.
-    const exe_mod = b.createModule(.{
-        // `root_source_file` is the Zig "entry point" of the module. If a module
-        // only contains e.g. external object files, you can make this `null`.
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
+    const dep_raylib = b.dependency("raylib_zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const raylib = dep_raylib.module("raylib");
+    const raylib_artifact = dep_raylib.artifact("raylib");
+
+    const mod_asteroids = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    // This creates another `std.Build.Step.Compile`, but this one builds an executable
-    // rather than a static library.
     const exe = b.addExecutable(.{
         .name = "asteroids_zig",
-        .root_module = exe_mod,
+        .root_module = mod_asteroids,
     });
 
-    const raylib_dep = b.dependency("raylib_zig", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const raylib = raylib_dep.module("raylib");
-    const raylib_artifact = raylib_dep.artifact("raylib");
     exe.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
 
-    b.installArtifact(exe);
+    add_assets_option(b, exe, target, optimize) catch |err| {
+        std.log.err("Problem adding assets: {!}", .{err});
+    };
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -76,7 +128,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
-        .root_module = exe_mod,
+        .root_module = mod_asteroids,
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
