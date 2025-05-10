@@ -78,6 +78,7 @@ fn buildNative(b: *std.Build) void {
     const dep_raylib = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
+        .linux_display_backend = .X11,
     });
     const raylib = dep_raylib.module("raylib");
     const raylib_artifact = dep_raylib.artifact("raylib");
