@@ -22,10 +22,10 @@ jobs:
         run: "zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe"
       - name: Build Mac_ARM
         run: "zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe"
-      - name: Build Linux_x86
-        run: "zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe"
-      - name: Build Linux_ARM
-        run: "zig build -Dtarget=aarch64-linux -Doptimize=ReleaseSafe"
+      # - name: Build Linux_x86
+      #   run: "zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe"
+      # - name: Build Linux_ARM
+      #   run: "zig build -Dtarget=aarch64-linux -Doptimize=ReleaseSafe"
       - name: Generate Checksums
         run: |
           cd ./zig-out/bin
