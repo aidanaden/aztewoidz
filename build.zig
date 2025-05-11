@@ -72,10 +72,12 @@ fn buildNative(b: *std.Build) void {
     // NOTE: system paths must be explicitly linked in cross-compile mode
     switch (target.result.os.tag) {
         .macos => {
-            const dep_macos_sdk = b.dependency("macos_sdk", .{ .target = target });
-            exe.addIncludePath(dep_macos_sdk.path("include"));
-            exe.addFrameworkPath(dep_macos_sdk.path("Frameworks"));
-            exe.addLibraryPath(dep_macos_sdk.path("lib"));
+            // Include xcode_frameworks for cross compilation
+            if (b.lazyDependency("xcode_frameworks", .{})) |dep| {
+                exe.addSystemFrameworkPath(dep.path("Frameworks"));
+                exe.addSystemIncludePath(dep.path("include"));
+                exe.addLibraryPath(dep.path("lib"));
+            }
         },
         .linux => {
             exe.linkSystemLibrary("GLX");

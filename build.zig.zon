@@ -40,9 +40,10 @@
             .url = "git+https://github.com/Not-Nik/raylib-zig#d4fc514d54a3b37b9b3e4f4983f611c3469e8c2a",
             .hash = "raylib_zig-5.6.0-dev-KE8REHguBQAE0xoNkra7mtEqr8cCZHk7k_03txLZB-cZ",
         },
-        .macos_sdk = .{
-            .url = "git+https://github.com/robbielyman/zig-build-macos-sdk.git#69df09a2244dc002ddf1b465dfb7c3c97f4922dc",
-            .hash = "macos_sdk-0.0.0-mYT8-9fYjAPcCwA-MzF9zXRRtQOm-uJcQIqwTiiAfyd6",
+        .xcode_frameworks = .{
+            .url = "git+https://github.com/hexops/xcode-frameworks#8a1cfb373587ea4c9bb1468b7c986462d8d4e10e",
+            .hash = "N-V-__8AABHMqAWYuRdIlflwi8gksPnlUMQBiSxAqQAAZFms",
+            .lazy = true,
         },
     },
     .paths = .{
