@@ -80,7 +80,8 @@ fn buildNative(b: *std.Build) void {
             }
         },
         .linux => {
-            const triple = target.result.linuxTriple(b.allocator) catch unreachable;
+            const builtin = @import("builtin");
+            const triple = builtin.target.linuxTriple(b.allocator) catch unreachable;
             raylib_artifact.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
             raylib_artifact.linkSystemLibrary("GLX");
             raylib_artifact.linkSystemLibrary("X11");
