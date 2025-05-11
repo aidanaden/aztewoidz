@@ -19,7 +19,7 @@ jobs:
           version: 0.14.0
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
-          tools: libwayland-dev
+          tools: libwayland-dev libgl1-mesa-dev libx11-dev
       - name: Build Windows
         run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe"
       # - name: Build Mac_x86
