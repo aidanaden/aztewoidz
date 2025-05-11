@@ -80,6 +80,8 @@ fn buildNative(b: *std.Build) void {
             }
         },
         .linux => {
+            const triple = try target.result.linuxTriple(b.allocator);
+            exe.addLibraryPath(.{ .path = b.fmt("/usr/lib/{s}", .{triple}) });
             exe.linkSystemLibrary("GLX");
             exe.linkSystemLibrary("X11");
             exe.linkSystemLibrary("Xcursor");
