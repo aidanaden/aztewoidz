@@ -40,37 +40,6 @@ pub fn build(b: *std.Build) void {
 // b.step("run", "Run pacman").dependOn(&run.step);
 // }
 
-fn add_assets_option(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
-    var options = b.addOptions();
-    var files = std.ArrayList([]const u8).init(b.allocator);
-    defer files.deinit();
-
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const path = try std.fs.cwd().realpath("src/assets", buf[0..]);
-
-    var dir = try std.fs.openDirAbsolute(path, .{
-        .iterate = true,
-    });
-    var dir_iter = dir.iterate();
-    while (try dir_iter.next()) |file| {
-        if (file.kind != .file) {
-            continue;
-        }
-        try files.append(b.dupe(file.name));
-    }
-
-    options.addOption([]const []const u8, "files", files.items);
-    exe.step.dependOn(&options.step);
-
-    const assets = b.addModule("assets", .{
-        .root_source_file = options.getOutput(),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    exe.root_module.addImport("assets", assets);
-}
-
 fn buildNative(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -78,7 +47,6 @@ fn buildNative(b: *std.Build) void {
     const dep_raylib = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
-        .linux_display_backend = .X11,
     });
     const raylib = dep_raylib.module("raylib");
     const raylib_artifact = dep_raylib.artifact("raylib");
@@ -92,10 +60,19 @@ fn buildNative(b: *std.Build) void {
         .name = "asteroids_zig",
         .root_module = mod_asteroids,
     });
-
     exe.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
 
+    // Explicitly link system paths when target is specified
+    // NOTE: system paths must be explicitly linked in cross-compile mode
+    if (target.result.os.tag.isDarwin()) {
+        const dep_macos_sdk = b.dependency("macos_sdk", .{ .target = target });
+        exe.addIncludePath(dep_macos_sdk.path("include"));
+        exe.addFrameworkPath(dep_macos_sdk.path("Frameworks"));
+        exe.addLibraryPath(dep_macos_sdk.path("lib"));
+    }
+
+    // Embed asset files into the output binary
     add_assets_option(b, exe, target, optimize) catch |err| {
         std.log.err("Problem adding assets: {!}", .{err});
     };
@@ -139,4 +116,35 @@ fn buildNative(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+}
+
+fn add_assets_option(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+    var options = b.addOptions();
+    var files = std.ArrayList([]const u8).init(b.allocator);
+    defer files.deinit();
+
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try std.fs.cwd().realpath("src/assets", buf[0..]);
+
+    var dir = try std.fs.openDirAbsolute(path, .{
+        .iterate = true,
+    });
+    var dir_iter = dir.iterate();
+    while (try dir_iter.next()) |file| {
+        if (file.kind != .file) {
+            continue;
+        }
+        try files.append(b.dupe(file.name));
+    }
+
+    options.addOption([]const []const u8, "files", files.items);
+    exe.step.dependOn(&options.step);
+
+    const assets = b.addModule("assets", .{
+        .root_source_file = options.getOutput(),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("assets", assets);
 }
