@@ -1,5 +1,10 @@
 const std = @import("std");
 
+// A file is just a struct, which can contain functions and other structs nested in it.
+// A module is a collection of structs, accessible via a root source file.
+// A package is a collection of modules, libraries, and build logic.
+// A library is a static or shared library file, e.g. .a, .dll, .so.
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -65,11 +70,28 @@ fn buildNative(b: *std.Build) void {
 
     // Explicitly link system paths when target is specified
     // NOTE: system paths must be explicitly linked in cross-compile mode
-    if (target.result.os.tag.isDarwin()) {
-        const dep_macos_sdk = b.dependency("macos_sdk", .{ .target = target });
-        exe.addIncludePath(dep_macos_sdk.path("include"));
-        exe.addFrameworkPath(dep_macos_sdk.path("Frameworks"));
-        exe.addLibraryPath(dep_macos_sdk.path("lib"));
+    switch (target.result.os.tag) {
+        .macos => {
+            const dep_macos_sdk = b.dependency("macos_sdk", .{ .target = target });
+            exe.addIncludePath(dep_macos_sdk.path("include"));
+            exe.addFrameworkPath(dep_macos_sdk.path("Frameworks"));
+            exe.addLibraryPath(dep_macos_sdk.path("lib"));
+        },
+        .linux => {
+            exe.linkSystemLibrary("GLX");
+            exe.linkSystemLibrary("X11");
+            exe.linkSystemLibrary("Xcursor");
+            exe.linkSystemLibrary("Xext");
+            exe.linkSystemLibrary("Xfixes");
+            exe.linkSystemLibrary("Xi");
+            exe.linkSystemLibrary("Xinerama");
+            exe.linkSystemLibrary("Xrandr");
+            exe.linkSystemLibrary("Xrender");
+            exe.linkSystemLibrary("EGL");
+            exe.linkSystemLibrary("wayland-client");
+            exe.linkSystemLibrary("xkbcommon");
+        },
+        else => {},
     }
 
     // Embed asset files into the output binary
