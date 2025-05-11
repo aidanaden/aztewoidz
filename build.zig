@@ -81,19 +81,19 @@ fn buildNative(b: *std.Build) void {
         },
         .linux => {
             const triple = target.result.linuxTriple(b.allocator) catch unreachable;
-            exe.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
-            exe.linkSystemLibrary("GLX");
-            exe.linkSystemLibrary("X11");
-            exe.linkSystemLibrary("Xcursor");
-            exe.linkSystemLibrary("Xext");
-            exe.linkSystemLibrary("Xfixes");
-            exe.linkSystemLibrary("Xi");
-            exe.linkSystemLibrary("Xinerama");
-            exe.linkSystemLibrary("Xrandr");
-            exe.linkSystemLibrary("Xrender");
-            exe.linkSystemLibrary("EGL");
-            exe.linkSystemLibrary("wayland-client");
-            exe.linkSystemLibrary("xkbcommon");
+            raylib.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
+            raylib.linkSystemLibrary("GLX");
+            raylib.linkSystemLibrary("X11");
+            raylib.linkSystemLibrary("Xcursor");
+            raylib.linkSystemLibrary("Xext");
+            raylib.linkSystemLibrary("Xfixes");
+            raylib.linkSystemLibrary("Xi");
+            raylib.linkSystemLibrary("Xinerama");
+            raylib.linkSystemLibrary("Xrandr");
+            raylib.linkSystemLibrary("Xrender");
+            raylib.linkSystemLibrary("EGL");
+            raylib.linkSystemLibrary("wayland-client");
+            raylib.linkSystemLibrary("xkbcommon");
         },
         else => {},
     }
