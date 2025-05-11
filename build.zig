@@ -82,7 +82,14 @@ fn buildNative(b: *std.Build) void {
         .linux => {
             const builtin = @import("builtin");
             const triple = builtin.target.linuxTriple(b.allocator) catch unreachable;
-            raylib_artifact.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
+            raylib_artifact.addLibraryPath(.{ .src_path = .{
+                .owner = b,
+                .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
+            } });
+            raylib_artifact.addSystemIncludePath(.{ .src_path = .{
+                .owner = b,
+                .sub_path = "/usr/include",
+            } });
             raylib_artifact.linkSystemLibrary("GLX");
             raylib_artifact.linkSystemLibrary("X11");
             raylib_artifact.linkSystemLibrary("Xcursor");
@@ -93,7 +100,7 @@ fn buildNative(b: *std.Build) void {
             raylib_artifact.linkSystemLibrary("Xrandr");
             raylib_artifact.linkSystemLibrary("Xrender");
             raylib_artifact.linkSystemLibrary("EGL");
-            raylib_artifact.linkSystemLibrary("wayland-client");
+            raylib_artifact.linkSystemLibrary("/usr/include/wayland-client");
             raylib_artifact.linkSystemLibrary("xkbcommon");
         },
         else => {},
