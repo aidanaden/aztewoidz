@@ -80,7 +80,10 @@ fn buildNative(b: *std.Build) void {
             }
         },
         .linux => {
-            const triple = try target.result.linuxTriple(b.allocator);
+            const triple = target.result.linuxTriple(b.allocator) catch |err| {
+                std.log.err("Problem parsing linux triple: {!}", .{err});
+            };
+
             exe.addLibraryPath(.{ .path = b.fmt("/usr/lib/{s}", .{triple}) });
             exe.linkSystemLibrary("GLX");
             exe.linkSystemLibrary("X11");
