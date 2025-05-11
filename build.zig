@@ -81,19 +81,19 @@ fn buildNative(b: *std.Build) void {
         },
         .linux => {
             const triple = target.result.linuxTriple(b.allocator) catch unreachable;
-            raylib.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
-            raylib.linkSystemLibrary("GLX");
-            raylib.linkSystemLibrary("X11");
-            raylib.linkSystemLibrary("Xcursor");
-            raylib.linkSystemLibrary("Xext");
-            raylib.linkSystemLibrary("Xfixes");
-            raylib.linkSystemLibrary("Xi");
-            raylib.linkSystemLibrary("Xinerama");
-            raylib.linkSystemLibrary("Xrandr");
-            raylib.linkSystemLibrary("Xrender");
-            raylib.linkSystemLibrary("EGL");
-            raylib.linkSystemLibrary("wayland-client");
-            raylib.linkSystemLibrary("xkbcommon");
+            raylib_artifact.addLibraryPath(.{ .src_path = .{ .owner = b, .sub_path = b.fmt("/usr/lib/{s}", .{triple}) } });
+            raylib_artifact.linkSystemLibrary("GLX");
+            raylib_artifact.linkSystemLibrary("X11");
+            raylib_artifact.linkSystemLibrary("Xcursor");
+            raylib_artifact.linkSystemLibrary("Xext");
+            raylib_artifact.linkSystemLibrary("Xfixes");
+            raylib_artifact.linkSystemLibrary("Xi");
+            raylib_artifact.linkSystemLibrary("Xinerama");
+            raylib_artifact.linkSystemLibrary("Xrandr");
+            raylib_artifact.linkSystemLibrary("Xrender");
+            raylib_artifact.linkSystemLibrary("EGL");
+            raylib_artifact.linkSystemLibrary("wayland-client");
+            raylib_artifact.linkSystemLibrary("xkbcommon");
         },
         else => {},
     }
