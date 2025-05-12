@@ -53,6 +53,8 @@ fn buildNative(b: *std.Build) void {
     const dep_raylib = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
+        // Default is set to use wayland, which is not on every distro
+        .linux_display_backend = .X11,
     });
     const raylib = dep_raylib.module("raylib");
     const raylib_artifact = dep_raylib.artifact("raylib");
