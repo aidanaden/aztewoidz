@@ -27,7 +27,7 @@ jobs:
       - name: Build Mac_ARM
         run: "zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe -Dexe_name=asteroid_mac_arm"
       - name: Build Linux_x86
-        run: "zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe  -Dexe_name=asteroid_linux_x86"
+        run: "zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe  -Dexe_name=asteroid_linux_x86 -Dlinux_display_backend=X11"
       # - name: Build Linux_ARM
       #   run: "zig build -Dtarget=aarch64-linux -Doptimize=ReleaseSafe"
       - name: Generate Checksums
