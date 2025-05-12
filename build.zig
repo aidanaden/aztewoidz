@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 // A file is just a struct, which can contain functions and other structs nested in it.
 // A module is a collection of structs, accessible via a root source file.
@@ -75,6 +76,27 @@ fn buildNative(b: *std.Build) void {
     exe.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
 
+    // Add linux system paths
+    if (builtin.os.tag == .linux) {
+        const triple = builtin.target.linuxTriple(b.allocator) catch unreachable;
+        raylib_artifact.addLibraryPath(.{ .src_path = .{
+            .owner = b,
+            .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
+        } });
+        raylib_artifact.addSystemIncludePath(.{ .src_path = .{
+            .owner = b,
+            .sub_path = "/usr/include",
+        } });
+        exe.addLibraryPath(.{ .src_path = .{
+            .owner = b,
+            .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
+        } });
+        exe.addSystemIncludePath(.{ .src_path = .{
+            .owner = b,
+            .sub_path = "/usr/include",
+        } });
+    }
+
     // Explicitly link system paths when target is specified
     // NOTE: system paths must be explicitly linked in cross-compile mode
     switch (target.result.os.tag) {
@@ -87,16 +109,6 @@ fn buildNative(b: *std.Build) void {
             }
         },
         .linux => {
-            const builtin = @import("builtin");
-            const triple = builtin.target.linuxTriple(b.allocator) catch unreachable;
-            raylib_artifact.addLibraryPath(.{ .src_path = .{
-                .owner = b,
-                .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
-            } });
-            raylib_artifact.addSystemIncludePath(.{ .src_path = .{
-                .owner = b,
-                .sub_path = "/usr/include",
-            } });
             raylib_artifact.linkSystemLibrary("GLX");
             raylib_artifact.linkSystemLibrary("X11");
             raylib_artifact.linkSystemLibrary("Xcursor");
@@ -109,15 +121,6 @@ fn buildNative(b: *std.Build) void {
             raylib_artifact.linkSystemLibrary("EGL");
             raylib_artifact.linkSystemLibrary("wayland-client");
             raylib_artifact.linkSystemLibrary("xkbcommon");
-
-            exe.addLibraryPath(.{ .src_path = .{
-                .owner = b,
-                .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
-            } });
-            exe.addSystemIncludePath(.{ .src_path = .{
-                .owner = b,
-                .sub_path = "/usr/include",
-            } });
             exe.linkSystemLibrary("GLX");
             exe.linkSystemLibrary("X11");
             exe.linkSystemLibrary("Xcursor");
