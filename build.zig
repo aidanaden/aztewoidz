@@ -61,8 +61,15 @@ fn buildNative(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    const exe_name = b.option(
+        []const u8,
+        "exe_name",
+        "Name of the executable",
+    ) orelse "asteroid";
+
     const exe = b.addExecutable(.{
-        .name = "asteroids_zig",
+        .name = exe_name,
         .root_module = mod_asteroids,
     });
     exe.linkLibrary(raylib_artifact);
