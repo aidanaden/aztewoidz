@@ -86,7 +86,7 @@ fn buildNative(b: *std.Build) void {
                 .owner = b,
                 .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
             } });
-            raylib_artifact.addSystemIncludePath(.{ .src_path = .{
+            raylib_artifact.addIncludePath(.{ .src_path = .{
                 .owner = b,
                 .sub_path = "/usr/include",
             } });
