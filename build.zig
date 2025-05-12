@@ -55,10 +55,6 @@ fn buildNative(b: *std.Build) void {
         .{
             .target = target,
             .optimize = optimize,
-            .options = .{
-                // Default is set to use wayland, which is not on every distro
-                .linux_display_backend = .X11,
-            },
         },
     );
     const raylib = dep_raylib.module("raylib");
