@@ -105,7 +105,7 @@ fn buildNative(b: *std.Build) void {
     switch (target.result.os.tag) {
         .macos => {
             // Include xcode_frameworks for cross compilation
-            if (b.lazyDependency("xcode_frameworks", .{})) |dep| {
+            if (b.lazyDependency("macos_sdk", .{})) |dep| {
                 exe.addSystemFrameworkPath(dep.path("Frameworks"));
                 exe.addSystemIncludePath(dep.path("include"));
                 exe.addLibraryPath(dep.path("lib"));
