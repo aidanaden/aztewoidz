@@ -86,7 +86,7 @@ fn buildNative(b: *std.Build) void {
                 .owner = b,
                 .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
             } });
-            raylib_artifact.addIncludePath(.{ .src_path = .{
+            raylib_artifact.addSystemIncludePath(.{ .src_path = .{
                 .owner = b,
                 .sub_path = "/usr/include",
             } });
@@ -100,7 +100,7 @@ fn buildNative(b: *std.Build) void {
             raylib_artifact.linkSystemLibrary("Xrandr");
             raylib_artifact.linkSystemLibrary("Xrender");
             raylib_artifact.linkSystemLibrary("EGL");
-            raylib_artifact.linkSystemLibrary("/usr/include/wayland-client");
+            raylib_artifact.linkSystemLibrary("wayland-client");
             raylib_artifact.linkSystemLibrary("xkbcommon");
         },
         else => {},
