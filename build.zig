@@ -102,6 +102,27 @@ fn buildNative(b: *std.Build) void {
             raylib_artifact.linkSystemLibrary("EGL");
             raylib_artifact.linkSystemLibrary("wayland-client");
             raylib_artifact.linkSystemLibrary("xkbcommon");
+
+            exe.addLibraryPath(.{ .src_path = .{
+                .owner = b,
+                .sub_path = b.fmt("/usr/lib/{s}", .{triple}),
+            } });
+            exe.addSystemIncludePath(.{ .src_path = .{
+                .owner = b,
+                .sub_path = "/usr/include",
+            } });
+            exe.linkSystemLibrary("GLX");
+            exe.linkSystemLibrary("X11");
+            exe.linkSystemLibrary("Xcursor");
+            exe.linkSystemLibrary("Xext");
+            exe.linkSystemLibrary("Xfixes");
+            exe.linkSystemLibrary("Xi");
+            exe.linkSystemLibrary("Xinerama");
+            exe.linkSystemLibrary("Xrandr");
+            exe.linkSystemLibrary("Xrender");
+            exe.linkSystemLibrary("EGL");
+            exe.linkSystemLibrary("wayland-client");
+            exe.linkSystemLibrary("xkbcommon");
         },
         else => {},
     }
