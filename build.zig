@@ -134,6 +134,34 @@ fn buildNative(b: *std.Build) void {
             exe.linkSystemLibrary("wayland-client");
             exe.linkSystemLibrary("xkbcommon");
         },
+        .windows => {
+            if (builtin.os.tag == .linux) {
+                raylib_artifact.linkSystemLibrary("GLX");
+                raylib_artifact.linkSystemLibrary("X11");
+                raylib_artifact.linkSystemLibrary("Xcursor");
+                raylib_artifact.linkSystemLibrary("Xext");
+                raylib_artifact.linkSystemLibrary("Xfixes");
+                raylib_artifact.linkSystemLibrary("Xi");
+                raylib_artifact.linkSystemLibrary("Xinerama");
+                raylib_artifact.linkSystemLibrary("Xrandr");
+                raylib_artifact.linkSystemLibrary("Xrender");
+                raylib_artifact.linkSystemLibrary("EGL");
+                raylib_artifact.linkSystemLibrary("wayland-client");
+                raylib_artifact.linkSystemLibrary("xkbcommon");
+                exe.linkSystemLibrary("GLX");
+                exe.linkSystemLibrary("X11");
+                exe.linkSystemLibrary("Xcursor");
+                exe.linkSystemLibrary("Xext");
+                exe.linkSystemLibrary("Xfixes");
+                exe.linkSystemLibrary("Xi");
+                exe.linkSystemLibrary("Xinerama");
+                exe.linkSystemLibrary("Xrandr");
+                exe.linkSystemLibrary("Xrender");
+                exe.linkSystemLibrary("EGL");
+                exe.linkSystemLibrary("wayland-client");
+                exe.linkSystemLibrary("xkbcommon");
+            }
+        },
         else => {},
     }
 
