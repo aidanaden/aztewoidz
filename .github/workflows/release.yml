@@ -19,7 +19,7 @@ jobs:
           version: 0.14.0
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
-          tools: libwayland-dev libwayland-client0 wayland-scanner libgl1-mesa-dev libx11-dev xorg-dev libegl-dev libgtk-4-dev build-essential
+          tools: libwayland-dev libwayland-client0 libgl1-mesa-dev libx11-dev xorg-dev libegl-dev libgtk-4-dev build-essential
       - name: Build Windows
         run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=asteroid_windows_x86"
       # - name: Build Mac_x86
