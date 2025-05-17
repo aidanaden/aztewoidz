@@ -22,8 +22,8 @@ jobs:
           sudo apt install libwayland-dev libwayland-client0 libgl1-mesa-dev libx11-dev xorg-dev libegl-dev libgtk-4-dev build-essential
       - name: Build Windows
         run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=asteroid_windows_x86"
-      # - name: Build Mac_x86
-      #   run: "zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe"
+      - name: Build Mac_x86
+        run: "zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe -Dexe_name=asteroid_mac_x86"
       - name: Build Mac_ARM
         run: "zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe -Dexe_name=asteroid_mac_arm"
       - name: Build Linux_x86
@@ -34,14 +34,14 @@ jobs:
         run: |
           cd ./zig-out/bin
           ls -al
-          sha256sum asteroid_windows_x86.exe asteroid_mac_arm asteroid_linux_x86 > checksums.txt
+          sha256sum asteroid_windows_x86.exe asteroid_mac_arm asteroid_mac_x86 asteroid_linux_x86 > checksums.txt
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             ./zig-out/bin/asteroid_windows_x86.exe
-            # ./zig-out/bin/asteroid_mac_x86
+            ./zig-out/bin/asteroid_mac_x86
             ./zig-out/bin/asteroid_mac_arm
             ./zig-out/bin/asteroid_linux_x86
             # ./zig-out/bin/asteroid_linux_arm
