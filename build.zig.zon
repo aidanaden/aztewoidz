@@ -45,6 +45,14 @@
             .hash = "macos_sdk-0.0.0-mYT8-9fYjAPcCwA-MzF9zXRRtQOm-uJcQIqwTiiAfyd6",
             .lazy = true,
         },
+        .emsdk = .{
+            .url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/4.0.8.tar.gz",
+            .hash = "N-V-__8AAApzDwDREOcPJxcPwmAnrkf5kFhua5jh-4xPPI6_",
+        },
+        .zemscripten = .{
+            .url = "git+https://github.com/zig-gamedev/zemscripten.git#cac24b72f87432ce607c02abcfad7822b702aad9",
+            .hash = "zemscripten-0.2.0-dev-sRlDqBtLAADUk3IZprWI0srnchHAXRSQu1n4wZiRvXmr",
+        },
     },
     .paths = .{
         "build.zig",

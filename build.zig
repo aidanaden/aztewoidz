@@ -1,55 +1,23 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const rlz = @import("raylib_zig");
 
 // A file is just a struct, which can contain functions and other structs nested in it.
 // A module is a collection of structs, accessible via a root source file.
 // A package is a collection of modules, libraries, and build logic.
 // A library is a static or shared library file, e.g. .a, .dll, .so.
 
-// Although this function looks imperative, note that its job is to
-// declaratively construct a build graph that will be executed by an external
-// runner.
 pub fn build(b: *std.Build) void {
-    buildNative(b);
-}
-
-// for web builds, the Zig code needs to be built into a library and linked with the Emscripten linker
-// fn buildWeb(b: *std.Build, opts: std.Options) !void {
-// const lib = b.addStaticLibrary(.{
-//     .name = "pacman",
-//     .root_module = opts.mod,
-// });
-//
-// const raylib = opts.dep_raylib.module("raylib");
-// const raylib_artifact = opts.dep_raylib.artifact("raylib");
-// exe.linkLibrary(raylib_artifact);
-// exe.root_module.addImport("raylib", raylib);
-// lib.step.dependOn(&shd.step);
-
-// // create a build step which invokes the Emscripten linker
-// const emsdk = opts.dep_sokol.builder.dependency("emsdk", .{});
-// const link_step = try sokol.emLinkStep(b, .{
-//     .lib_main = lib,
-//     .target = opts.mod.resolved_target.?,
-//     .optimize = opts.mod.optimize.?,
-//     .emsdk = emsdk,
-//     .use_webgl2 = true,
-//     .use_emmalloc = true,
-//     .use_filesystem = false,
-//     .shell_file_path = opts.dep_sokol.path("src/sokol/web/shell.html"),
-// });
-// // attach Emscripten linker output to default install step
-// b.getInstallStep().dependOn(&link_step.step);
-// // ...and a special run step to start the web build output via 'emrun'
-// const run = sokol.emRunStep(b, .{ .name = "pacman", .emsdk = emsdk });
-// run.step.dependOn(&link_step.step);
-// b.step("run", "Run pacman").dependOn(&run.step);
-// }
-
-fn buildNative(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    if (target.query.os_tag.? == .emscripten) {
+        build_web(b, optimize);
+        return;
+    }
+    build_native(b, target, optimize);
+}
 
+fn build_native(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
     const dep_raylib = b.dependency(
         "raylib_zig",
         .{
@@ -60,7 +28,7 @@ fn buildNative(b: *std.Build) void {
     const raylib = dep_raylib.module("raylib");
     const raylib_artifact = dep_raylib.artifact("raylib");
 
-    const mod_asteroids = b.createModule(.{
+    const mod_exe = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
@@ -70,11 +38,11 @@ fn buildNative(b: *std.Build) void {
         []const u8,
         "exe_name",
         "Name of the executable",
-    ) orelse "asteroid";
+    ) orelse "astewoid";
 
     const exe = b.addExecutable(.{
         .name = exe_name,
-        .root_module = mod_asteroids,
+        .root_module = mod_exe,
     });
     exe.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
@@ -137,57 +105,94 @@ fn buildNative(b: *std.Build) void {
             exe.linkSystemLibrary("wayland-client");
             exe.linkSystemLibrary("xkbcommon");
         },
-        .windows => {},
         else => {},
     }
 
     // Embed asset files into the output binary
-    add_assets_option(b, exe, target, optimize) catch |err| {
+    add_assets(b, exe, target, optimize) catch |err| {
         std.log.err("Problem adding assets: {!}", .{err});
     };
 
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
     b.installArtifact(exe);
-
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
     const run_cmd = b.addRunArtifact(exe);
-
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
+    const run_step = b.step("run", "Run the astewoid compiled natively");
     run_step.dependOn(&run_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
-        .root_module = mod_asteroids,
+        .root_module = mod_exe,
     });
-
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
 }
 
-fn add_assets_option(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .cpu_model = .{ .explicit = &std.Target.wasm.cpu.mvp },
+        .cpu_features_add = std.Target.wasm.featureSet(&.{
+            .atomics,
+            .bulk_memory,
+        }),
+        .os_tag = .emscripten,
+    });
+
+    const raylib_dep = b.dependency("raylib_zig", .{
+        .target = wasm_target,
+        .optimize = optimize,
+    });
+    const raylib = raylib_dep.module("raylib");
+    const raylib_artifact = raylib_dep.artifact("raylib");
+
+    const exe_lib = rlz.emcc.compileForEmscripten(b, "astewoids", "src/main.zig", wasm_target, optimize) catch |err| {
+        std.log.err("Problem compiling executable for emscripten: {!}", .{err});
+        return;
+    };
+    exe_lib.linkLibrary(raylib_artifact);
+    exe_lib.root_module.addImport("raylib", raylib);
+    exe_lib.shared_memory = false;
+    exe_lib.root_module.single_threaded = false;
+
+    // Embed asset files into the output binary
+    add_assets(b, exe_lib, wasm_target, optimize) catch |err| {
+        std.log.err("Problem adding assets: {!}", .{err});
+    };
+
+    // Note that raylib itself is not actually added to the exe_lib output file, so it also needs to be linked with emscripten.
+    const link_step = rlz.emcc.linkWithEmscripten(b, &[_]*std.Build.Step.Compile{ exe_lib, raylib_artifact }) catch |err| {
+        std.log.err("Problem linking executable and raylib with emscripten: {!}", .{err});
+        return;
+    };
+
+    // Allow executable to access assets
+    link_step.addArg("--embed-file");
+    link_step.addArg("src/assets/");
+
+    // Linking  options
+    link_step.addArgs(&.{
+        "-sWASM_MEM_MAX=128MB", // Going higher than that seems not to work on iOS browsers ¯\_(ツ)_/¯
+        "-sTOTAL_MEMORY=128MB",
+        // "-sFULL-ES3=1", // Required for emulating OpenGL v3
+        "-sUSE_GLFW=3", // Use GLFW 3 (better performance)
+        "-sSTACK_SIZE=6553600", // Required to not instantly crash (large stack size (~60MB) required since everything is stored in the stack)
+        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPF32",
+    });
+
+    b.getInstallStep().dependOn(&link_step.step);
+    const run_step = rlz.emcc.emscriptenRunStep(b) catch |err| {
+        std.log.err("Problem creating emscripten run step: {!}", .{err});
+        return;
+    };
+    run_step.step.dependOn(&link_step.step);
+    const run_option = b.step("run", "Run astewoids compiled with emscripten");
+    run_option.dependOn(&run_step.step);
+}
+
+/// Add all files within the `src/assets` folder into the executable binary
+fn add_assets(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
     var options = b.addOptions();
     var files = std.ArrayList([]const u8).init(b.allocator);
     defer files.deinit();
