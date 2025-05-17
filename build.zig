@@ -38,7 +38,7 @@ fn build_native(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         []const u8,
         "exe_name",
         "Name of the executable",
-    ) orelse "astewoid";
+    ) orelse "aztewoidz";
 
     const exe = b.addExecutable(.{
         .name = exe_name,
@@ -118,7 +118,7 @@ fn build_native(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-    const run_step = b.step("run", "Run the astewoid compiled natively");
+    const run_step = b.step("run", "Run the aztewoidz compiled natively");
     run_step.dependOn(&run_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
@@ -147,7 +147,7 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
 
-    const exe_lib = rlz.emcc.compileForEmscripten(b, "astewoids", "src/main.zig", wasm_target, optimize) catch |err| {
+    const exe_lib = rlz.emcc.compileForEmscripten(b, "aztewoidz", "src/main.zig", wasm_target, optimize) catch |err| {
         std.log.err("Problem compiling executable for emscripten: {!}", .{err});
         return;
     };
@@ -187,7 +187,7 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         return;
     };
     run_step.step.dependOn(&link_step.step);
-    const run_option = b.step("run", "Run astewoids compiled with emscripten");
+    const run_option = b.step("run", "Run aztewoidz compiled with emscripten");
     run_option.dependOn(&run_step.step);
 }
 
