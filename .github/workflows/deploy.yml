@@ -1,0 +1,35 @@
+name: Deploy web
+on:
+  push:
+    tags:
+      - "**"
+  workflow_dispatch: # Allows manual triggering
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Install Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0
+      - name: Install emsdk
+        uses: mymindstorm/setup-emsdk@v14
+      - name: Verify emsdk
+        run: |
+          emcc -v
+          echo "EMSDK=$EMSDK" >> $GITHUB_ENV
+      - name: Build with emscripten
+        run: "zig build -Dtarget=wasm32-emscripten -Doptimize=ReleaseSmall --sysroot $EMSDK"
+      - name: Publish
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: aztewoidz
+          directory: zig-out/htmlout
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

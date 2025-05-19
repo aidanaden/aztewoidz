@@ -10,7 +10,7 @@ const rlz = @import("raylib_zig");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    if (target.query.os_tag.? == .emscripten) {
+    if (target.query.os_tag != null and target.query.os_tag.? == .emscripten) {
         build_web(b, optimize);
         return;
     }
@@ -167,15 +167,23 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         return;
     };
 
-    // Allow executable to access assets
+    // Embedding stores the specified files inside the wasm file,
+    // while preloading packages them in a bundle on the side.
+    // Embedding files is more efficient than preloading because
+    // there isn’t a separate file to download and copy, but
+    // preloading enables the option to separately host the data.
     link_step.addArg("--embed-file");
     link_step.addArg("src/assets/");
+
+    // Use custom HTML template
+    link_step.addArg("--shell-file");
+    link_step.addArg("shell.html");
 
     // Linking  options
     link_step.addArgs(&.{
         "-sWASM_MEM_MAX=128MB", // Going higher than that seems not to work on iOS browsers ¯\_(ツ)_/¯
         "-sTOTAL_MEMORY=128MB",
-        // "-sFULL-ES3=1", // Required for emulating OpenGL v3
+        "-sFULL-ES3=1", // Forces support for all GLES3 features, not just the WebGL2-friendly subset. This automatically turns on FULL_ES2 and WebGL2 support.
         "-sUSE_GLFW=3", // Use GLFW 3 (better performance)
         "-sSTACK_SIZE=6553600", // Required to not instantly crash (large stack size (~60MB) required since everything is stored in the stack)
         "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPF32",

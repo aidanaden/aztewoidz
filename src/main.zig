@@ -26,8 +26,10 @@ const embedded_files_map = std.StaticStringMap([]const u8).initComptime(generate
 
 // GLOBALS
 const Window = struct {
-    const WIDTH = 640 * 2;
-    const HEIGHT = 480 * 2;
+    // const WIDTH = 640 * 2;
+    // const HEIGHT = 480 * 2;
+    const WIDTH = 1400;
+    const HEIGHT = 1080;
     const FPS = 60.0;
 };
 
