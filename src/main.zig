@@ -3,31 +3,10 @@ const math = std.math;
 const rl = @import("raylib");
 const rlm = rl.math;
 const Vector2 = rl.Vector2;
-const assets = @import("assets");
-
-// kv pair type used to fill ComptimeStringMap
-const EmbeddedAsset = struct {
-    []const u8,
-    []const u8,
-};
-
-fn generate_asset_map() [assets.files.len]EmbeddedAsset {
-    var embedded_assets: [assets.files.len]EmbeddedAsset = undefined;
-    comptime var i = 0;
-    inline for (assets.files) |file| {
-        embedded_assets[i][0] = file;
-        embedded_assets[i][1] = @embedFile("assets/" ++ file);
-        i += 1;
-    }
-    return embedded_assets;
-}
-
-const embedded_files_map = std.StaticStringMap([]const u8).initComptime(generate_asset_map());
+const assets = @import("assets.zig").embedded_files_map;
 
 // GLOBALS
 const Window = struct {
-    // const WIDTH = 640 * 2;
-    // const HEIGHT = 480 * 2;
     const WIDTH = 1400;
     const HEIGHT = 1080;
     const FPS = 60.0;
@@ -65,25 +44,25 @@ const Sound = struct {
             .ship = .{
                 .fire = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
                     ".wav",
-                    embedded_files_map.get(params.ship.fire).?,
+                    assets.get(params.ship.fire).?,
                 )),
                 .thrust = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
                     ".wav",
-                    embedded_files_map.get(params.ship.thrust).?,
+                    assets.get(params.ship.thrust).?,
                 )),
             },
             .asteroid = .{
                 .small = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
                     ".wav",
-                    embedded_files_map.get(params.asteroid.small).?,
+                    assets.get(params.asteroid.small).?,
                 )),
                 .medium = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
                     ".wav",
-                    embedded_files_map.get(params.asteroid.medium).?,
+                    assets.get(params.asteroid.medium).?,
                 )),
                 .large = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
                     ".wav",
-                    embedded_files_map.get(params.asteroid.large).?,
+                    assets.get(params.asteroid.large).?,
                 )),
             },
             // .ship = .{
@@ -985,17 +964,16 @@ fn handleAsteroidCollision(asteroid: *Asteroid, impact: Vector2) void {
         .Small => null,
     };
 
-    // Generate debris for smallest asteroid
-    if (nextSize == null) {
-        const dots = Particle.generate(
+    // Generate debris
+    state.particles.appendSlice(
+        &Particle.generate(
             .DOT,
             asteroid.position,
             state.rand,
-            10,
+            12,
             null,
-        );
-        state.particles.appendSlice(&dots) catch unreachable;
-    }
+        ),
+    ) catch unreachable;
 
     // Generate smaller asteroids
     if (nextSize != null) {

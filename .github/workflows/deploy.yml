@@ -9,8 +9,8 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      deployments: write
+      contents: write # required to create releases
+      deployments: write # required to enable github deployments (required by cloudflare/pages-action)
     steps:
       - name: Clone repository
         uses: actions/checkout@v3

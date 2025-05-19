@@ -3,35 +3,51 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Emscripten-Generated Code</title>
+    <title>Aztewoidz</title>
     <style>
-      .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
-      textarea.emscripten { font-family: monospace; width: 80%; }
-      div.emscripten { text-align: center; }
-      div.emscripten_border { border: 1px solid black; }
+      body {
+        background-color: black;
+      }
+      .emscripten {
+        padding-right: 0;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+      }
+      textarea.emscripten {
+        font-family: monospace; width: 80%;
+      }
+      div.emscripten {
+        text-align: center;
+      }
+      div.emscripten_border {
+        border: 1px solid black;
+      }
       /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas.emscripten { border: 0px none; background-color: black;
-    position: absolute;
-    /* left: 0px; */
-    left: 50%;
-    transform: translate(-50%, 0);
-    top: 0px;
-    margin: 0px;
-    border: 0;
-    /* width: 100%; */
-    height: 100%;
-    aspect-ratio: 4/3 auto;
-    overflow: hidden;
-    display: block;
-    image-rendering: optimizeSpeed;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: -o-crisp-edges;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: optimize-contrast;
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
-    -ms-interpolation-mode: nearest-neighbor; }
-
+      canvas.emscripten {
+        border: 0px none;
+        background-color: black;
+        position: absolute;
+        /* left: 0px; */
+        left: 50%;
+        transform: translate(-50%, 0);
+        top: 0px;
+        margin: 0px;
+        border: 0;
+        /* width: 100%; */
+        height: 100%;
+        aspect-ratio: 4/3 auto;
+        overflow: hidden;
+        display: block;
+        image-rendering: optimizeSpeed;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: -o-crisp-edges;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: optimize-contrast;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+        -ms-interpolation-mode: nearest-neighbor;
+      }
       .spinner {
         height: 50px;
         width: 50px;
@@ -63,7 +79,6 @@
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
       }
-
     </style>
   </head>
   <body>

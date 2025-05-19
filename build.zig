@@ -187,6 +187,9 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         "-sUSE_GLFW=3", // Use GLFW 3 (better performance)
         "-sSTACK_SIZE=6553600", // Required to not instantly crash (large stack size (~60MB) required since everything is stored in the stack)
         "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPF32",
+        // recommended/required when using `while(!WindowShouldClose())`,
+        // see https://github.com/raysan5/raylib/wiki/Working-for-Web-(HTML5)#42-use-standard-raylib-whilewindowshouldclose-loop
+        "-sASYNCIFY",
     });
 
     b.getInstallStep().dependOn(&link_step.step);
