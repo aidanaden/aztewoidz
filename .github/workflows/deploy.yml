@@ -20,7 +20,7 @@ jobs:
           version: 0.14.0
       - name: Install wayland # TODO: existing bug, this is required to bypass bug and build raylib-zig
         run: |
-          sudo apt update && sudo apt upgrade && sudo apt install libwayland-dev libx11-dev libegl-dev libxkbcommon-dev
+          sudo apt update && sudo apt upgrade && sudo apt install libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev
       - name: Install emsdk
         uses: mymindstorm/setup-emsdk@v14
       - name: Verify emsdk
