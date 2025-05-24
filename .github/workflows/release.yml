@@ -8,18 +8,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64-windows, x86-64_macos, aarc64-macos, x86_64-linux]
-        include:
-          - target: x86_64-windows
-            exe_name: aztewoidz_windows_x86
-          - target: x86-64_macos
-            exe_name: aztewoidz_mac_x86
-          - target: aarc64-macos
-            exe_name: aztewoidz_mac_arm
-          - target: x86_64-linux
-            exe_name: aztewoidz_linux_x86
     permissions:
       contents: write # required to create releases
     steps:
@@ -33,9 +21,12 @@ jobs:
         with:
           packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev
           version: 1.0
-      # - name: Install wayland # TODO: existing bug, this is required to bypass bug and build raylib-zig
-      #   run: |
-      #     sudo apt update && sudo apt upgrade && sudo apt install libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev
+      - name: Build executables
+        run: |
+          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86 &
+          zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_x86 &
+          zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_arm &
+          zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe  -Dexe_name=aztewoidz_linux_x86
       # - name: Build Windows
       #   run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86"
       # - name: Build Mac_x86
@@ -46,8 +37,6 @@ jobs:
       #   run: "zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe  -Dexe_name=aztewoidz_linux_x86"
       # - name: Build Linux_ARM
       #   run: "zig build -Dtarget=aarch64-linux -Doptimize=ReleaseSafe"
-      - name: Build executables
-        run: "zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseSafe -Dexe_name=${{ matrix.exe_name }}"
       - name: Generate Checksums
         run: |
           cd ./zig-out/bin
