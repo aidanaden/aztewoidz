@@ -1194,7 +1194,7 @@ pub fn main() !void {
     rl.initWindow(
         Window.WIDTH,
         Window.HEIGHT,
-        "raylib-zig [core] example - basic window",
+        "Aztewoidz",
     );
     // Close window and OpenGL context
     defer rl.closeWindow();
