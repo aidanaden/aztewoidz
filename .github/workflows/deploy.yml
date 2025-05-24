@@ -34,10 +34,10 @@ jobs:
       - name: Build with emscripten
         run: "zig build -Dtarget=wasm32-emscripten -Doptimize=ReleaseSmall --sysroot $EMSDK/upstream/emscripten"
       - name: Publish
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: aztewoidz
-          directory: zig-out/htmlout
+          command: pages deploy zig-out/htmlout --project-name=aztewoidz
+          # Optional: Enable this if you want to have GitHub Deployments triggered
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
