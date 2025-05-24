@@ -19,7 +19,7 @@ jobs:
           version: 0.14.0
       - name: Install wayland
         run: |
-          sudo apt update && apt install libwayland-dev libwayland-client0 libgl1-mesa-dev libx11-dev xorg-dev libegl-dev libgtk-4-dev build-essential
+          sudo apt update && sudo apt upgrade && sudo apt install libwayland-dev libwayland-client0 libgl1-mesa-dev libx11-dev xorg-dev libegl-dev libgtk-4-dev build-essential
       - name: Build Windows
         run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86"
       - name: Build Mac_x86
