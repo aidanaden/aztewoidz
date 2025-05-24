@@ -22,10 +22,20 @@ const Sound = struct {
         fire: rl.Sound,
         thrust: rl.Sound,
     };
+    const SaucerSound = struct {
+        small: rl.Sound,
+        large: rl.Sound,
+    };
+    const BeatSound = struct {
+        first: rl.Sound,
+        second: rl.Sound,
+    };
     const VOLUME: f32 = 0.5;
 
     ship: ShipSound,
     asteroid: AsteroidSound,
+    saucer: SaucerSound,
+    beat: BeatSound,
 
     const Self = @This();
     const InitParams = struct {
@@ -37,6 +47,14 @@ const Sound = struct {
             small: [:0]const u8,
             medium: [:0]const u8,
             large: [:0]const u8,
+        },
+        saucer: struct {
+            small: [:0]const u8,
+            large: [:0]const u8,
+        },
+        beat: struct {
+            first: [:0]const u8,
+            second: [:0]const u8,
         },
     };
     fn init(params: InitParams) !Self {
@@ -65,15 +83,26 @@ const Sound = struct {
                     assets.get(params.asteroid.large).?,
                 )),
             },
-            // .ship = .{
-            //     .fire = try rl.loadSound(params.ship.fire),
-            //     .thrust = try rl.loadSound(params.ship.thrust),
-            // },
-            // .asteroid = .{
-            //     .small = try rl.loadSound(params.asteroid.small),
-            //     .medium = try rl.loadSound(params.asteroid.medium),
-            //     .large = try rl.loadSound(params.asteroid.large),
-            // },
+            .saucer = .{
+                .small = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
+                    ".wav",
+                    assets.get(params.saucer.small).?,
+                )),
+                .large = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
+                    ".wav",
+                    assets.get(params.saucer.large).?,
+                )),
+            },
+            .beat = .{
+                .first = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
+                    ".wav",
+                    assets.get(params.beat.first).?,
+                )),
+                .second = rl.loadSoundFromWave(try rl.loadWaveFromMemory(
+                    ".wav",
+                    assets.get(params.beat.second).?,
+                )),
+            },
         };
     }
     fn deinit(self: *Self) void {
@@ -82,6 +111,10 @@ const Sound = struct {
         rl.unloadSound(self.asteroid.small);
         rl.unloadSound(self.asteroid.medium);
         rl.unloadSound(self.asteroid.large);
+        rl.unloadSound(self.saucer.small);
+        rl.unloadSound(self.saucer.large);
+        rl.unloadSound(self.beat.first);
+        rl.unloadSound(self.beat.second);
     }
 };
 var sound: ?Sound = null;
@@ -1183,6 +1216,14 @@ pub fn main() !void {
             .medium = "bangMedium.wav",
             .large = "bangLarge.wav",
         },
+        .saucer = .{
+            .small = "saucerSmall.wav",
+            .large = "saucerBig.wav",
+        },
+        .beat = .{
+            .first = "beat1.wav",
+            .second = "beat2.wav",
+        },
     }) catch null;
 
     if (sound != null) {
@@ -1191,6 +1232,10 @@ pub fn main() !void {
         rl.setSoundVolume(sound.?.asteroid.small, Sound.VOLUME);
         rl.setSoundVolume(sound.?.asteroid.medium, Sound.VOLUME);
         rl.setSoundVolume(sound.?.asteroid.large, Sound.VOLUME);
+        rl.setSoundVolume(sound.?.saucer.small, Sound.VOLUME);
+        rl.setSoundVolume(sound.?.saucer.small, Sound.VOLUME);
+        rl.setSoundVolume(sound.?.beat.first, Sound.VOLUME);
+        rl.setSoundVolume(sound.?.beat.second, Sound.VOLUME);
     }
     defer {
         if (sound != null) {
