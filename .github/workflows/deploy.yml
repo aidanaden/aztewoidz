@@ -36,9 +36,8 @@ jobs:
       - name: Publish
         uses: cloudflare/wrangler-action@v3
         with:
-          branch: main
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy zig-out/htmlout --project-name=aztewoidz
+          command: pages deploy zig-out/htmlout --project-name=aztewoidz --branch=main
           # Optional: Enable this if you want to have GitHub Deployments triggered
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
