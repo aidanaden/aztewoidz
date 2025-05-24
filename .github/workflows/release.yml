@@ -23,9 +23,9 @@ jobs:
           version: 1.0
       - name: Build executables
         run: |
-          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86 &
-          zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_x86 &
-          zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_arm &
+          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86 &&
+          zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_x86 &&
+          zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_mac_arm &&
           zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSafe  -Dexe_name=aztewoidz_linux_x86
       # - name: Build Windows
       #   run: "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86"
