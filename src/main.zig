@@ -131,9 +131,11 @@ const State = struct {
     projectiles: std.BoundedArray(Projectile, MAX_PROJECTILES),
     now: f32 = 0.0,
     delta_time: f32 = 0.0,
+    frame: u32 = 0,
+    prev_beat_idx: u32 = 0,
     rand: *const std.Random,
     score: Score = Score.init(0),
-    difficulty: Difficulty = .Easy,
+    level: Level,
     quit: bool = false,
 
     const Self = @This();
@@ -143,6 +145,11 @@ const State = struct {
         const projectiles = try std.BoundedArray(Projectile, MAX_PROJECTILES).init(0);
         var new_state = Self{
             .ship = Ship.init(),
+            .level = Level{
+                .difficulty = .Easy,
+                .max_score = 0,
+                .score = 0,
+            },
             .rand = rand,
             .asteroids = asteroids,
             .particles = particles,
@@ -152,10 +159,30 @@ const State = struct {
         return new_state;
     }
 
+    fn level_up(self: *Self) void {
+        reset(self, self.level.difficulty.increment());
+    }
+
+    fn reset(self: *Self, difficulty: ?Level.Difficulty) void {
+        if (difficulty != null) {
+            self.level.difficulty = difficulty.?;
+        }
+        state.particles.clear();
+        state.projectiles.clear();
+        state.ship.reset();
+        state.generate_asteroids();
+    }
+
+    fn add_score(self: *Self, value: u32) void {
+        self.score.value += value;
+        self.level.score += value;
+    }
+
     fn generate_asteroids(self: *Self) void {
         self.asteroids.clear();
 
-        const num_asteroids = self.difficulty.num_asteroids();
+        const num_asteroids = self.level.difficulty.num_asteroids();
+        var level_score: u32 = 0;
         for (0..num_asteroids) |_| {
             const angle = math.tau * self.rand.float(f32);
             const size = self.rand.enumValue(Asteroid.Size);
@@ -172,33 +199,41 @@ const State = struct {
                 size,
                 self.rand.int(u64),
             );
+            level_score += asteroid.size.total_score();
             self.asteroids.append(asteroid) catch unreachable;
         }
+
+        self.level.score = 0;
+        self.level.max_score = level_score;
     }
 };
 var state: State = undefined;
 
-const Difficulty = enum {
-    Easy,
-    Medium,
-    Hard,
+const Level = struct {
+    const MAX_GENERATED = 42;
 
-    const Self = @This();
-    fn num_asteroids(self: Self) usize {
-        return switch (self) {
-            .Easy => 20,
-            .Medium => 32,
-            .Hard => 42,
-        };
-    }
+    difficulty: Difficulty = .Easy,
+    score: u32,
+    max_score: u32,
 
-    fn increment(self: Self) ?Self {
-        return switch (self) {
-            .Easy => .Medium,
-            .Medium => .Hard,
-            .Hard => null,
-        };
-    }
+    const Difficulty = enum(u8) {
+        Easy = 0,
+        Medium = 1,
+        Hard = 2,
+
+        const Self = @This();
+        fn num_asteroids(self: Difficulty) usize {
+            return switch (self) {
+                .Easy => 20,
+                .Medium => 32,
+                .Hard => MAX_GENERATED,
+            };
+        }
+
+        fn increment(self: Difficulty) Difficulty {
+            return if (self == .Hard) self else (@enumFromInt(@intFromEnum(self) + 1));
+        }
+    };
 };
 
 const Ship = struct {
@@ -374,10 +409,10 @@ const Asteroid = struct {
     const MIN_POINTS = 10;
     const MAX_POINTS = 16;
 
-    const Size = enum {
-        Big,
-        Medium,
-        Small,
+    const Size = enum(u8) {
+        Small = 0,
+        Medium = 1,
+        Big = 2,
 
         const Self = @This();
         fn size(self: Size) f32 {
@@ -396,12 +431,21 @@ const Asteroid = struct {
             };
         }
 
+        // Score obtained from destroying asteroid of current size
         fn score(self: Size) u32 {
             return switch (self) {
                 .Big => 20,
                 .Medium => 40,
                 .Small => 80,
             };
+        }
+
+        // Max obtainable score from destroying asteroid of current size and all sizes smaller
+        fn total_score(self: Size) u32 {
+            if (self == .Small) {
+                return self.score();
+            }
+            return self.score() + (2 * total_score(@enumFromInt(@intFromEnum(self) - 1)));
         }
 
         fn play_sound(self: Size) ?rl.Sound {
@@ -763,6 +807,7 @@ fn update() void {
 
     state.delta_time = rl.getFrameTime();
     state.now += state.delta_time;
+    defer state.frame += 1;
 
     // Update ship position state
     if (!state.ship.is_dead(state.now)) {
@@ -891,7 +936,7 @@ fn update() void {
             // Remove destroyed asteroid
             if (asteroid.remove) {
                 // Update score
-                state.score.value += asteroid.size.score();
+                state.add_score(asteroid.size.score());
 
                 // Play asteroid destroyed sound if available
                 const asteroid_sound = asteroid.size.play_sound();
@@ -975,18 +1020,33 @@ fn update() void {
     if (state.ship.is_dead(state.now) and (state.now - state.ship.death_time) >= 3.0) {
         // Reset stage if no more lives
         if (state.ship.lives == 0) {
-            reset();
+            state.reset(.Easy);
         } else {
-            respawn();
+            state.ship.respawn();
         }
     }
 
     if (state.asteroids.len == 0) {
-        const next_difficulty = state.difficulty.increment();
-        if (next_difficulty != null) {
-            state.difficulty = next_difficulty.?;
+        state.level_up();
+    }
+
+    // Output frequency of background beat based on progress of current level
+    // Progress of current level is calculated via `current score / level max score`
+    const current_progress: f32 = @as(f32, @floatFromInt(state.level.score)) / @as(f32, @floatFromInt(state.level.max_score));
+    const interval: f32 = 2.5 - (current_progress * 2.4);
+
+    // 0 percent we play each beat once every 2.5s
+    //
+    // 100 percent we play each beat once every 0.1s
+    if (sound != null) {
+        const frame_interval: u32 = @intFromFloat(Window.FPS * interval);
+        if (@mod(state.frame, frame_interval) != 0) {
+            return;
         }
-        reset();
+        const beat = if (state.prev_beat_idx == 0) sound.?.beat.first else sound.?.beat.second;
+        state.prev_beat_idx = @mod(state.prev_beat_idx + 1, 2);
+        state.frame = 0;
+        rl.playSound(beat);
     }
 }
 
@@ -1046,18 +1106,6 @@ fn handleAsteroidCollision(asteroid: *Asteroid, impact: Vector2) void {
         //     &.{ firstAsteroid, secondAsteroid },
         // ) catch unreachable;
     }
-}
-
-fn respawn() void {
-    state.ship.respawn();
-}
-
-fn reset() void {
-    state.particles.clear();
-    state.projectiles.clear();
-    state.generate_asteroids();
-    state.ship.reset();
-    state.score.reset();
 }
 
 const Score = struct {
