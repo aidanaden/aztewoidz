@@ -25,14 +25,14 @@ jobs:
       # - name: Install wayland # TODO: existing bug, this is required to bypass bug and build raylib-zig
       #   run: |
       #     sudo apt update && sudo apt upgrade && sudo apt install libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev
-      - name: Install emsdk
-        uses: mymindstorm/setup-emsdk@v14
-      - name: Verify emsdk
-        run: |
-          emcc -v
-          echo "EMSDK=$EMSDK" >> $GITHUB_ENV
+      # - name: Install emsdk
+      #   uses: mymindstorm/setup-emsdk@v14
+      # - name: Verify emsdk
+      #   run: |
+      #     emcc -v
+      #     echo "EMSDK=$EMSDK" >> $GITHUB_ENV
       - name: Build with emscripten
-        run: "zig build -Dtarget=wasm32-emscripten -Doptimize=ReleaseSmall --sysroot $EMSDK/upstream/emscripten"
+        run: "zig build -Dtarget=wasm32-emscripten -Doptimize=ReleaseSmall"
       - name: Publish
         uses: cloudflare/wrangler-action@v3
         with:
