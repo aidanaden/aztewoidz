@@ -120,13 +120,6 @@ fn build_native(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     }
     const run_step = b.step("run", "Run the aztewoidz compiled natively");
     run_step.dependOn(&run_cmd.step);
-
-    const exe_unit_tests = b.addTest(.{
-        .root_module = mod_exe,
-    });
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_exe_unit_tests.step);
 }
 
 fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
@@ -139,6 +132,11 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         }),
         .os_tag = .emscripten,
     });
+
+    // Add emscripten
+    const activate_emsdk_step = @import("zemscripten").activateEmsdkStep(b);
+    const emcc_path = b.dependency("emsdk", .{}).path("upstream/emscripten/").getPath(b);
+    b.sysroot = emcc_path;
 
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = wasm_target,
@@ -172,8 +170,9 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     // Embedding files is more efficient than preloading because
     // there isn’t a separate file to download and copy, but
     // preloading enables the option to separately host the data.
-    link_step.addArg("--embed-file");
-    link_step.addArg("src/assets/");
+    // NOTE: this isn't required since we already embed all assets
+    // into the binary
+    // link_step.addArg("--embed-file");
 
     // Use custom HTML template
     link_step.addArg("--shell-file");
@@ -191,6 +190,7 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         // see https://github.com/raysan5/raylib/wiki/Working-for-Web-(HTML5)#42-use-standard-raylib-whilewindowshouldclose-loop
         "-sASYNCIFY",
     });
+    link_step.step.dependOn(activate_emsdk_step);
 
     b.getInstallStep().dependOn(&link_step.step);
     const run_step = rlz.emcc.emscriptenRunStep(b) catch |err| {

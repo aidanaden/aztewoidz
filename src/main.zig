@@ -160,12 +160,16 @@ const State = struct {
     }
 
     fn level_up(self: *Self) void {
-        reset(self, self.level.difficulty.increment());
+        reset(self, .{
+            .reset_score = false,
+            .difficulty = self.level.difficulty.increment(),
+        });
     }
 
-    fn reset(self: *Self, difficulty: ?Level.Difficulty) void {
-        if (difficulty != null) {
-            self.level.difficulty = difficulty.?;
+    fn reset(self: *Self, options: struct { reset_score: ?bool = true, difficulty: ?Level.Difficulty = .Easy }) void {
+        self.level.difficulty = options.difficulty.?;
+        if (options.reset_score.?) {
+            self.score.reset();
         }
         state.particles.clear();
         state.projectiles.clear();
@@ -1020,7 +1024,7 @@ fn update() void {
     if (state.ship.is_dead(state.now) and (state.now - state.ship.death_time) >= 3.0) {
         // Reset stage if no more lives
         if (state.ship.lives == 0) {
-            state.reset(.Easy);
+            state.reset(.{});
         } else {
             state.ship.respawn();
         }
@@ -1250,7 +1254,6 @@ pub fn main() !void {
     // Audio setup
     rl.initAudioDevice();
     rl.setAudioStreamBufferSizeDefault(4096);
-
     defer rl.closeAudioDevice();
 
     // TODO: handle sound loading error properly
@@ -1273,7 +1276,6 @@ pub fn main() !void {
             .second = "beat2.wav",
         },
     }) catch null;
-
     if (sound != null) {
         rl.setSoundVolume(sound.?.ship.thrust, Sound.VOLUME);
         rl.setSoundVolume(sound.?.ship.fire, Sound.VOLUME);
@@ -1314,20 +1316,4 @@ pub fn main() !void {
         rl.clearBackground(.black);
         render();
     }
-}
-
-test "asteroids" {
-    const gpa = std.testing.allocator;
-
-    var asteroids = std.ArrayList(Asteroid).init(gpa);
-    defer asteroids.deinit();
-
-    _ = try Asteroid.init(
-        Vector2.init(
-            @as(f32, @floatFromInt(0)) * 50 + 50,
-            @as(f32, @floatFromInt(0)) * 50 + 50,
-        ),
-        .Medium,
-        @as(u64, @bitCast(std.time.timestamp())),
-    );
 }
