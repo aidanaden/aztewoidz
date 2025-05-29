@@ -49,10 +49,6 @@
             .url = "git+https://github.com/emscripten-core/emsdk#4.0.9",
             .hash = "N-V-__8AAJl1DwBezhYo_VE6f53mPVm00R-Fk28NPW7P14EQ",
         },
-        .zemscripten = .{
-            .url = "git+https://github.com/zig-gamedev/zemscripten.git#cac24b72f87432ce607c02abcfad7822b702aad9",
-            .hash = "zemscripten-0.2.0-dev-sRlDqBtLAADUk3IZprWI0srnchHAXRSQu1n4wZiRvXmr",
-        },
     },
     .paths = .{
         "build.zig",

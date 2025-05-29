@@ -134,7 +134,7 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     });
 
     // Add emscripten
-    const activate_emsdk_step = @import("zemscripten").activateEmsdkStep(b);
+    const activate_emsdk_step = activateEmsdkStep(b);
     const emcc_path = b.dependency("emsdk", .{}).path("upstream/emscripten/").getPath(b);
     b.sysroot = emcc_path;
 
@@ -232,4 +232,74 @@ fn add_assets(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.Res
     });
 
     exe.root_module.addImport("assets", assets);
+}
+
+// Taken from https://github.com/zig-gamedev/zemscripten/blob/main/build.zig
+pub fn activateEmsdkStep(b: *std.Build) *std.Build.Step {
+    const emsdk_script_path = std.fs.path.join(b.allocator, &.{
+        b.dependency("emsdk", .{}).path("").getPath(b),
+        switch (builtin.target.os.tag) {
+            .windows => "emsdk.bat",
+            else => "emsdk",
+        },
+    }) catch unreachable;
+
+    const emsdk_version = "4.0.9";
+    var emsdk_install = b.addSystemCommand(&.{ emsdk_script_path, "install", emsdk_version });
+
+    switch (builtin.target.os.tag) {
+        .linux, .macos => {
+            emsdk_install.step.dependOn(&b.addSystemCommand(&.{ "chmod", "+x", emsdk_script_path }).step);
+        },
+        else => {},
+    }
+
+    var emsdk_activate = b.addSystemCommand(&.{ emsdk_script_path, "activate", emsdk_version });
+    emsdk_activate.step.dependOn(&emsdk_install.step);
+
+    const step = b.allocator.create(std.Build.Step) catch unreachable;
+    step.* = std.Build.Step.init(.{
+        .id = .custom,
+        .name = "Activate EMSDK",
+        .owner = b,
+        .makeFn = &struct {
+            fn make(_: *std.Build.Step, _: std.Build.Step.MakeOptions) anyerror!void {}
+        }.make,
+    });
+
+    switch (builtin.target.os.tag) {
+        .linux, .macos => {
+            const chmod_emcc = b.addSystemCommand(&.{ "chmod", "+x", emccPath(b) });
+            chmod_emcc.step.dependOn(&emsdk_activate.step);
+
+            const chmod_emrun = b.addSystemCommand(&.{ "chmod", "+x", emrunPath(b) });
+            chmod_emrun.step.dependOn(&emsdk_activate.step);
+
+            step.dependOn(&chmod_emcc.step);
+            step.dependOn(&chmod_emrun.step);
+        },
+        else => {},
+    }
+
+    return step;
+}
+
+pub fn emccPath(b: *std.Build) []const u8 {
+    return std.fs.path.join(b.allocator, &.{
+        b.dependency("emsdk", .{}).path("upstream/emscripten/").getPath(b),
+        switch (builtin.target.os.tag) {
+            .windows => "emcc.bat",
+            else => "emcc",
+        },
+    }) catch unreachable;
+}
+
+pub fn emrunPath(b: *std.Build) []const u8 {
+    return std.fs.path.join(b.allocator, &.{
+        b.dependency("emsdk", .{}).path("upstream/emscripten/").getPath(b),
+        switch (builtin.target.os.tag) {
+            .windows => "emrun.bat",
+            else => "emrun",
+        },
+    }) catch unreachable;
 }
