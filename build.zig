@@ -164,6 +164,7 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         std.log.err("Problem linking executable and raylib with emscripten: {!}", .{err});
         return;
     };
+    link_step.step.dependOn(activate_emsdk_step);
 
     // Embedding stores the specified files inside the wasm file,
     // while preloading packages them in a bundle on the side.
@@ -190,7 +191,6 @@ fn build_web(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         // see https://github.com/raysan5/raylib/wiki/Working-for-Web-(HTML5)#42-use-standard-raylib-whilewindowshouldclose-loop
         "-sASYNCIFY",
     });
-    link_step.step.dependOn(activate_emsdk_step);
 
     b.getInstallStep().dependOn(&link_step.step);
     const run_step = rlz.emcc.emscriptenRunStep(b) catch |err| {

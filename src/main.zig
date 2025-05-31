@@ -1030,28 +1030,46 @@ fn update() void {
         }
     }
 
+    // Level up if all asteroids destroyed
     if (state.asteroids.len == 0) {
         state.level_up();
     }
 
-    // Output frequency of background beat based on progress of current level
-    // Progress of current level is calculated via `current score / level max score`
-    const current_progress: f32 = @as(f32, @floatFromInt(state.level.score)) / @as(f32, @floatFromInt(state.level.max_score));
-    const interval: f32 = 2.5 - (current_progress * 2.4);
-
-    // 0 percent we play each beat once every 2.5s
-    //
-    // 100 percent we play each beat once every 0.1s
+    // Play background beat
     if (sound != null) {
-        const frame_interval: u32 = @intFromFloat(Window.FPS * interval);
-        if (@mod(state.frame, frame_interval) != 0) {
-            return;
+        const max_interval: usize = @intFromFloat(Window.FPS * 3);
+        const max_interval_log: u32 = math.log2_int(u32, max_interval) - 1;
+        // Output frequency of background beat based on progress of current level
+        // Progress of current level is calculated via `current score / level max score`
+        const current_progress: f32 = (@as(f32, @floatFromInt(state.level.score)) / @as(f32, @floatFromInt(state.level.max_score)));
+        const value = sigmoid_scale(current_progress, 0, max_interval_log, 5);
+        const frame_interval: usize = @max(5, max_interval >> @intCast(value));
+        // Only play beat every `frame_interval` frames
+        if (@mod(state.frame, frame_interval) == 0) {
+            const beat = if (state.prev_beat_idx == 0) sound.?.beat.first else sound.?.beat.second;
+            state.prev_beat_idx = @mod(state.prev_beat_idx + 1, 2);
+            state.frame = 0;
+            rl.playSound(beat);
         }
-        const beat = if (state.prev_beat_idx == 0) sound.?.beat.first else sound.?.beat.second;
-        state.prev_beat_idx = @mod(state.prev_beat_idx + 1, 2);
-        state.frame = 0;
-        rl.playSound(beat);
     }
+}
+
+fn sigmoid_scale(ratio: f32, min: u32, max: u32, steepness: ?u32) u32 {
+    // Move input x from [0, 1] to the range of [-0.5, 0.5] since sigmoid
+    // returns 0.5 ONLY when input = 0.
+    const rescaled: f32 = ratio - 0.5;
+
+    // Scale output result. `steepness` value determines how close
+    // the ouputs are to 0 and 1. See examples below.
+    // steepness = 2, input: [-1, 1], output: [0.26, 0.73]
+    // steepness = 10, input: [-5, 5], output: [0.0067, 0.9933]
+    const x: f32 = rescaled * @as(f32, @floatFromInt(if (steepness != null) steepness.? else 10));
+
+    // Calculate approx. sigmoid value
+    // S_approx(x) = 0.5 * (x / (1 + |x|) + 1)
+    const sig_val: f32 = 0.5 * (x / (1 + @abs(x)) + 1);
+    const value: f32 = @as(f32, @floatFromInt(min)) + sig_val * @as(f32, @floatFromInt(max - min));
+    return @as(u32, @intFromFloat(value));
 }
 
 fn handleAsteroidCollision(asteroid: *Asteroid, impact: Vector2) void {
