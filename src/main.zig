@@ -123,12 +123,14 @@ const State = struct {
     const MAX_ASTEROIDS = 1000;
     const MAX_PARTICLES = 1000;
     const MAX_PROJECTILES = 5;
+    const MAX_ALIENS = 5;
 
     /// Current time (accumulation of delta time where delta time = time in seconds for last frame drawn)
     ship: Ship,
     asteroids: std.BoundedArray(Asteroid, MAX_ASTEROIDS),
     particles: std.BoundedArray(Particle, MAX_PARTICLES),
     projectiles: std.BoundedArray(Projectile, MAX_PROJECTILES),
+    aliens: std.BoundedArray(Alien, MAX_ALIENS),
     now: f32 = 0.0,
     delta_time: f32 = 0.0,
     frame: u32 = 0,
@@ -143,6 +145,7 @@ const State = struct {
         const asteroids = try std.BoundedArray(Asteroid, MAX_ASTEROIDS).init(0);
         const particles = try std.BoundedArray(Particle, MAX_PARTICLES).init(0);
         const projectiles = try std.BoundedArray(Projectile, MAX_PROJECTILES).init(0);
+        const aliens = try std.BoundedArray(Alien, MAX_ALIENS).init(0);
         var new_state = Self{
             .ship = Ship.init(),
             .level = Level{
@@ -154,6 +157,7 @@ const State = struct {
             .asteroids = asteroids,
             .particles = particles,
             .projectiles = projectiles,
+            .aliens = aliens,
         };
         new_state.generate_asteroids();
         return new_state;
@@ -164,6 +168,7 @@ const State = struct {
             .reset_score = false,
             .difficulty = self.level.difficulty.increment(),
         });
+        state.ship.lives += 1;
     }
 
     fn reset(self: *Self, options: struct { reset_score: ?bool = true, difficulty: ?Level.Difficulty = .Easy }) void {
@@ -173,7 +178,7 @@ const State = struct {
         }
         state.particles.clear();
         state.projectiles.clear();
-        state.ship.reset();
+        state.ship.respawn();
         state.generate_asteroids();
     }
 
@@ -296,11 +301,6 @@ const Ship = struct {
         );
         self.velocity = Vector2.init(0, 0);
         self.rotation = 0.0;
-    }
-
-    fn reset(self: *Self) void {
-        self.respawn();
-        self.lives = MAX_LIVES;
     }
 
     fn is_dead(self: *Self, now: f32) bool {
@@ -540,6 +540,85 @@ const Asteroid = struct {
     }
 };
 
+const Alien = struct {
+    const POINTS = .{
+        // Tip of ship
+        Vector2.init(0.0, -0.62),
+        // Left wing of ship
+        Vector2.init(-0.42, 0.62),
+        // Left sub-wing of ship
+        Vector2.init(-0.21, 0.48),
+        // Right sub-wing of ship
+        Vector2.init(0.21, 0.48),
+        // Right wing of ship
+        Vector2.init(0.42, 0.62),
+    };
+    size: Size,
+    position: Vector2,
+    velocity: Vector2,
+    remove: bool = false,
+
+    const Size = enum(u8) {
+        Small = 0,
+        Big = 1,
+
+        const Self = @This();
+        fn size(self: Size) f32 {
+            return switch (self) {
+                .Big => Line.SCALE * 3.69,
+                .Small => Line.SCALE * 0.69,
+            };
+        }
+
+        fn velocity(self: Size) f32 {
+            return switch (self) {
+                .Big => 0.32,
+                .Small => 1.5,
+            };
+        }
+
+        // Score obtained from destroying asteroid of current size
+        fn score(self: Size) u32 {
+            return switch (self) {
+                .Big => 20,
+                .Small => 80,
+            };
+        }
+
+        // Max obtainable score from destroying asteroid of current size and all sizes smaller
+        fn total_score(self: Size) u32 {
+            if (self == .Small) {
+                return self.score();
+            }
+            return self.score() + (2 * total_score(@enumFromInt(@intFromEnum(self) - 1)));
+        }
+
+        fn play_sound(self: Size) ?rl.Sound {
+            if (sound == null) {
+                return null;
+            }
+            return switch (self) {
+                .Big => sound.?.saucer.large,
+                .Small => sound.?.saucer.small,
+            };
+        }
+    };
+
+    const Self = @This();
+    fn init() Self {}
+
+    fn draw(self: *const Self) void {
+        draw_lines(
+            self.position,
+            self.size.size(),
+            0.0,
+            &Alien.POINTS,
+            true,
+            true,
+        );
+    }
+};
+
 /// Ship debris generated when ship is destroyed
 const Particle = struct {
     const Type = enum {
@@ -555,8 +634,11 @@ const Particle = struct {
             radius: f32,
         },
     };
-    const MIN_TTL = 1.0;
+    const MIN_TTL = 0.42;
     const RAND_TTL = 1.0;
+    const MIN_VEL = 0.42;
+    const RAND_VEL = 0.42;
+    const RAND_OFFSET = 0.33;
 
     position: Vector2,
     velocity: Vector2 = Vector2.init(0, 0),
@@ -581,8 +663,8 @@ const Particle = struct {
             // NOTE: tau = 2 * pi = 360 degrees
             const min_angle = ((math.tau / @as(f32, @floatFromInt(amount))) * @as(f32, @floatFromInt(i)));
             // Randomly generate an offset amount for randomness.
-            // Without doing this, asteroids will be circles!
-            const offset = min_angle * 0.33 * rand.float(f32);
+            // Without doing this, dots will distributed in an exact circle!
+            const offset = min_angle * RAND_OFFSET * rand.float(f32);
             const angle = min_angle + offset;
 
             const actual_ttl = ttl orelse MIN_TTL + (RAND_TTL * rand.float(f32));
@@ -594,7 +676,7 @@ const Particle = struct {
                 ),
                 .velocity = rlm.vector2Scale(
                     Vector2.init(math.cos(angle), math.sin(angle)),
-                    0.75,
+                    MIN_VEL + RAND_VEL * rand.float(f32),
                 ),
                 .type = .DOT,
                 .data = .{ .DOT = .{ .radius = 1 } },
@@ -862,7 +944,6 @@ fn update() void {
                     // generate ship debris particles if dead
                     if (ship_collision) {
                         state.ship.die(state.now);
-                        // const ttl = 1.0 + state.rand.float(f32);
                         const lines = Particle.generate(
                             .LINE,
                             state.ship.position,
@@ -1036,7 +1117,7 @@ fn update() void {
     }
 
     // Play background beat
-    if (sound != null) {
+    if (!state.ship.is_dead(state.now) and sound != null) {
         const max_interval: usize = @intFromFloat(Window.FPS * 3);
         const max_interval_log: u32 = math.log2_int(u32, max_interval) - 1;
         // Output frequency of background beat based on progress of current level
@@ -1274,7 +1355,6 @@ pub fn main() !void {
     rl.setAudioStreamBufferSizeDefault(4096);
     defer rl.closeAudioDevice();
 
-    // TODO: handle sound loading error properly
     sound = Sound.init(.{
         .ship = .{
             .thrust = "thrust.wav",
@@ -1295,15 +1375,7 @@ pub fn main() !void {
         },
     }) catch null;
     if (sound != null) {
-        rl.setSoundVolume(sound.?.ship.thrust, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.ship.fire, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.asteroid.small, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.asteroid.medium, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.asteroid.large, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.saucer.small, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.saucer.small, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.beat.first, Sound.VOLUME);
-        rl.setSoundVolume(sound.?.beat.second, Sound.VOLUME);
+        rl.setMasterVolume(Sound.VOLUME);
     }
     defer {
         if (sound != null) {

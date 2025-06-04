@@ -14,12 +14,12 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v3
       - name: Install Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.0
+          version: 0.14.1
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev
+          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs
           version: 1.0
       - name: Build executables
         run: |
@@ -32,6 +32,16 @@ jobs:
           cd ./zig-out/bin
           ls -al
           sha256sum aztewoidz_windows_x86.exe aztewoidz_mac_arm aztewoidz_mac_x86 aztewoidz_linux_x86 > checksums.txt
+      - name: Generate DMG
+        run: |
+          dd if=/dev/zero of=/tmp/aztewoidz.dmg bs=1M count=16 status=progress
+          mkfs.hfsplus -v "Aztewoidz Installer" /tmp/aztewoidz.dmg
+      - name: Mount DMG
+        run: |
+          mkdir -pv /mnt/tmp
+          sudo mount -o loop /tmp/aztewoidz.dmg /mnt/tmp
+          sudo cp -av ./zig-out/bin/aztewoidz_mac_arm /mnt/tmp
+          sudo umount /mnt/tmp
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -43,4 +53,5 @@ jobs:
             ./zig-out/bin/aztewoidz_linux_x86
             # ./zig-out/bin/aztewoidz_linux_arm
             ./zig-out/bin/checksums.txt
+            /tmp/aztewoidz.dmg
             LICENSE

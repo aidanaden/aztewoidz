@@ -118,7 +118,7 @@ fn build_native(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-    const run_step = b.step("run", "Run the aztewoidz compiled natively");
+    const run_step = b.step("run", "Run aztewoidz compiled natively");
     run_step.dependOn(&run_cmd.step);
 }
 
