@@ -21,6 +21,11 @@ jobs:
         with:
           packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs hfsplus hfsutils
           version: 1.0
+      - name: Upgrade
+        run: |
+          sudo apt update -y
+          sudo apt upgrade -y
+          sudo apt dist-upgrade
       - name: Build executables
         run: |
           zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe -Dexe_name=aztewoidz_windows_x86 &&
