@@ -19,7 +19,7 @@ jobs:
           version: 0.14.1
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs
+          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs kmod-hfsplus
           version: 1.0
       - name: Build executables
         run: |
