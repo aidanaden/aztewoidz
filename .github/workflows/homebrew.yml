@@ -1,6 +1,8 @@
+name: Release homebrew
 on:
   release:
     types: [published]
+  workflow_dispatch: # Allows manual triggering
 jobs:
   homebrew-releaser:
     runs-on: ubuntu-latest
