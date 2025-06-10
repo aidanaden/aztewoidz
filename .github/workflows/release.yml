@@ -21,27 +21,27 @@ jobs:
         with:
           packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs hfsplus hfsutils
           version: 1.0
-      - name: Upgrade
-        run: |
-          sudo apt update -y
-          sudo apt upgrade -y
-          sudo apt dist-upgrade
+      # - name: Upgrade
+      #   run: |
+      #     sudo apt update -y
+      #     sudo apt upgrade -y
+      #     sudo apt dist-upgrade
       - name: Build executables
         run: |
-          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{ github.ref_name }}-windows-x86 &&
-          zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{ github.ref_name }}-darwin-x86 &&
-          zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{ github.ref_name }}-darwin-aarch64 &&
-          zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSmall  -Dexe_name=aztewoidz-${{ github.ref_name }}-linux-x86
+          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{github.ref_name}}-windows-x86 &&
+          zig build -Dtarget=x86_64-macos -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{github.ref_name}}-darwin-x86 &&
+          zig build -Dtarget=aarch64-macos -Doptimize=ReleaseSmall -Dexe_name=aztewoidz-${{github.ref_name}}-darwin-aarch64 &&
+          zig build -Dtarget=x86_64-linux -Doptimize=ReleaseSmall  -Dexe_name=aztewoidz-${{github.ref_name}}-linux-x86
       - name: Create TAR files
         run: |
+          cd ./zig-out/bin
           tar -czvf aztewoidz-${{github.ref_name}}-darwin-amd64.tar.gz aztewoidz-${{github.ref_name}}-darwin-x86
           tar -czvf aztewoidz-${{github.ref_name}}-darwin-arm64.tar.gz aztewoidz-${{github.ref_name}}-darwin-aarch64
           tar -czvf aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz aztewoidz-${{github.ref_name}}-linux-x86
       - name: Generate Checksums
         run: |
-          cd ./zig-out/bin
           ls -al
-          sha256sum aztewoidz-${{ github.ref_name }}-windows-x86.exe aztewoidz-${{ github.ref_name }}-darwin-x86 aztewoidz-${{ github.ref_name }}-darwin-aarch64 aztewoidz-${{ github.ref_name }}-linux-x86 aztewoidz-${{github.ref_name}}-darwin-amd64.tar.gz aztewoidz-${{github.ref_name}}-darwin-arm64.tar.gz aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz > checksums.txt
+          sha256sum aztewoidz-${{github.ref_name}}-windows-x86.exe aztewoidz-${{github.ref_name}}-darwin-x86 aztewoidz-${{github.ref_name}}-darwin-aarch64 aztewoidz-${{github.ref_name}}-linux-x86 aztewoidz-${{github.ref_name}}-darwin-amd64.tar.gz aztewoidz-${{github.ref_name}}-darwin-arm64.tar.gz aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz > checksums.txt
       # - name: Generate DMG
       #   run: |
       #     dd if=/dev/zero of=/tmp/aztewoidz.dmg bs=1M count=16 status=progress
