@@ -83,7 +83,7 @@ jobs:
           # Optional, use the origin repository instead of forking
           no_fork: false
           # Optional, defaults to homebrew/core
-          tap: homebrew-games
+          tap: aidanaden/homebrew-games
           # Formula name, required
           formula: aztewoidz
           # Optional, will be determined automatically
