@@ -19,7 +19,7 @@ jobs:
           version: 0.14.1
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs hfsplus hfsutils
+          packages: libwayland-dev libx11-dev xorg-dev libegl-dev libxkbcommon-dev hfsprogs hfsplus hfsutils python3
           version: 1.0
       # - name: Upgrade
       #   run: |
@@ -108,7 +108,7 @@ jobs:
           # custom_require: custom_download_strategy
           # Allows you to add custom includes inside the formula class, before dependencies and install blocks.
           # Optional - string
-          # formula_includes: 'include Language::Python::Virtualenv'
+          formula_includes: 'include Language::Python::Virtualenv'
           # Run 'brew update-python-resources' on the formula to add Python resources.
           # Docs: https://docs.brew.sh/Python-for-Formula-Authors#python-declarations-for-applications
           # Default is shown - boolean
