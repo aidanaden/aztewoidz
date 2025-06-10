@@ -38,7 +38,7 @@ jobs:
           mkfs.hfsplus -v "Aztewoidz Installer" /tmp/aztewoidz.dmg
       - name: Mount DMG
         run: |
-          mkdir -pv /mnt/tmp
+          sudo mkdir -pv /mnt/tmp
           sudo mount -o loop /tmp/aztewoidz.dmg /mnt/tmp
           sudo cp -av ./zig-out/bin/aztewoidz_mac_arm /mnt/tmp
           sudo umount /mnt/tmp
