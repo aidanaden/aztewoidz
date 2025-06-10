@@ -69,3 +69,10 @@ jobs:
             ./zig-out/bin/aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz
             ./zig-out/bin/checksums.txt
             LICENSE
+      - name: Update Homebrew Formula
+        uses: izumin5210/action-homebrew-tap@releases/v0
+        with:
+          tap: izumin5210/homebrew-tools
+          token: ${{ secrets.HOMEBREW_ACCESS_TOKEN }}
+          tap-token: ${{ secrets.HOMEBREW_ACCESS_TOKEN }}
+        if: startsWith(github.ref, 'refs/tags/')
