@@ -79,11 +79,11 @@ jobs:
           # Optional, will commit with this user email
           # user_email: email@example.com
           # Optional, will create tap repo fork in organization
-          # org: aidanaden
+          org: aidanaden
           # Optional, use the origin repository instead of forking
           no_fork: false
           # Optional, defaults to homebrew/core
-          tap: aidanaden/homebrew-games
+          tap: homebrew-games
           # Formula name, required
           formula: aztewoidz
           # Optional, will be determined automatically
