@@ -35,9 +35,12 @@ jobs:
       - name: Create TAR files
         run: |
           cd ./zig-out/bin
-          tar -czvf aztewoidz-${{github.ref_name}}-darwin-amd64.tar.gz aztewoidz-${{github.ref_name}}-darwin-x86
-          tar -czvf aztewoidz-${{github.ref_name}}-darwin-arm64.tar.gz aztewoidz-${{github.ref_name}}-darwin-aarch64
-          tar -czvf aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz aztewoidz-${{github.ref_name}}-linux-x86
+          mkdir darwin-amd64 && cp aztewoidz-${{github.ref_name}}-darwin-x86 darwin-amd64/aztewoidz
+          mkdir darwin-arm64 && cp aztewoidz-${{github.ref_name}}-darwin-aarch64 darwin-arm64/aztewoidz
+          mkdir linux-amd64 && cp aztewoidz-${{github.ref_name}}-linux-x86 linux-amd64/aztewoidz
+          tar -czvf aztewoidz-${{github.ref_name}}-darwin-amd64.tar.gz darwin-amd64/aztewoidz
+          tar -czvf aztewoidz-${{github.ref_name}}-darwin-arm64.tar.gz darwin-arm64/aztewoidz
+          tar -czvf aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz linux-amd64/aztewoidz
       - name: Generate Checksums
         run: |
           cd ./zig-out/bin
