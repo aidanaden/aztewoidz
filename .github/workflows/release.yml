@@ -72,29 +72,29 @@ jobs:
             ./zig-out/bin/aztewoidz-${{github.ref_name}}-linux-amd64.tar.gz
             ./zig-out/bin/checksums.txt
             LICENSE
-      - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@v4
-        with:
-          # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
-          token: ${{secrets.HOMEBREW_ACCESS_TOKEN}}
-          # Optional, will commit with this user name
-          # user_name: name
-          # Optional, will commit with this user email
-          # user_email: email@example.com
-          # Optional, will create tap repo fork in organization
-          # org: aidanaden
-          # Optional, use the origin repository instead of forking
-          no_fork: false
-          # Optional, defaults to homebrew/core
-          tap: aidanaden/homebrew-games
-          # Formula name, required
-          formula: aztewoidz
-          # Optional, will be determined automatically
-          tag: ${{github.ref}}
-          # Optional, will be determined automatically
-          revision: ${{github.sha}}
-          # Optional, if don't want to check for already open PRs
-          force: true # true
+          # - name: Update Homebrew formula
+          #   uses: dawidd6/action-homebrew-bump-formula@v4
+          #   with:
+          #     # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
+          #     token: ${{secrets.HOMEBREW_ACCESS_TOKEN}}
+          #     # Optional, will commit with this user name
+          #     # user_name: name
+          #     # Optional, will commit with this user email
+          #     # user_email: email@example.com
+          #     # Optional, will create tap repo fork in organization
+          #     # org: aidanaden
+          #     # Optional, use the origin repository instead of forking
+          #     no_fork: false
+          #     # Optional, defaults to homebrew/core
+          #     tap: aidanaden/homebrew-games
+          #     # Formula name, required
+          #     formula: aztewoidz
+          #     # Optional, will be determined automatically
+          #     tag: ${{github.ref}}
+          #     # Optional, will be determined automatically
+          #     revision: ${{github.sha}}
+          #     # Optional, if don't want to check for already open PRs
+          #     force: true # true
     # - name: Update Homebrew Formula
     #   uses: izumin5210/action-homebrew-tap@releases/v0
     #   with:
