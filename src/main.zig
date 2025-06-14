@@ -122,18 +122,18 @@ var sound: ?Sound = null;
 const State = struct {
     const MAX_ASTEROIDS = 1000;
     const MAX_PARTICLES = 1000;
-    const MAX_PROJECTILES = 5;
+    const MAX_PROJECTILES = 10;
     const MAX_ALIENS = 5;
+    const DRAG = 0.03;
 
     /// Current time (accumulation of delta time where delta time = time in seconds for last frame drawn)
     ship: Ship,
     asteroids: std.BoundedArray(Asteroid, MAX_ASTEROIDS),
     particles: std.BoundedArray(Particle, MAX_PARTICLES),
-    projectiles: std.BoundedArray(Projectile, MAX_PROJECTILES),
     aliens: std.BoundedArray(Alien, MAX_ALIENS),
     now: f32 = 0.0,
     delta_time: f32 = 0.0,
-    frame: u32 = 0,
+    last_beat_time: f32 = 0.0,
     prev_beat_idx: u32 = 0,
     rand: *const std.Random,
     score: Score = Score.init(0),
@@ -144,7 +144,6 @@ const State = struct {
     fn init(rand: *const std.Random) !Self {
         const asteroids = try std.BoundedArray(Asteroid, MAX_ASTEROIDS).init(0);
         const particles = try std.BoundedArray(Particle, MAX_PARTICLES).init(0);
-        const projectiles = try std.BoundedArray(Projectile, MAX_PROJECTILES).init(0);
         const aliens = try std.BoundedArray(Alien, MAX_ALIENS).init(0);
         var new_state = Self{
             .ship = Ship.init(),
@@ -156,10 +155,10 @@ const State = struct {
             .rand = rand,
             .asteroids = asteroids,
             .particles = particles,
-            .projectiles = projectiles,
             .aliens = aliens,
         };
         new_state.generate_asteroids();
+        new_state.generate_alien();
         return new_state;
     }
 
@@ -177,9 +176,9 @@ const State = struct {
             self.score.reset();
         }
         state.particles.clear();
-        state.projectiles.clear();
         state.ship.respawn();
         state.generate_asteroids();
+        state.generate_alien();
     }
 
     fn add_score(self: *Self, value: u32) void {
@@ -214,6 +213,20 @@ const State = struct {
 
         self.level.score = 0;
         self.level.max_score = level_score;
+    }
+
+    fn generate_alien(self: *Self) void {
+        if (self.aliens.len == Self.MAX_ALIENS) {
+            return;
+        }
+        const position =
+            Vector2.init(
+                if (self.rand.boolean()) 0.0 else Window.WIDTH * 1.5,
+                self.rand.float(f32) * Window.HEIGHT,
+            );
+        self.aliens.append(
+            Alien.init(position, Alien.Size.Small),
+        ) catch unreachable;
     }
 };
 var state: State = undefined;
@@ -276,10 +289,13 @@ const Ship = struct {
     rotation: f32 = 0.0,
     death_time: f32 = 0.0,
     lives: usize = MAX_LIVES,
+    projectiles: std.BoundedArray(Projectile, State.MAX_PROJECTILES),
 
     const Self = @This();
     fn init() Self {
+        const projectiles = std.BoundedArray(Projectile, State.MAX_PROJECTILES).init(0) catch unreachable;
         return Self{
+            .projectiles = projectiles,
             .position = rlm.vector2Scale(
                 Vector2.init(
                     Window.WIDTH,
@@ -301,6 +317,7 @@ const Ship = struct {
         );
         self.velocity = Vector2.init(0, 0);
         self.rotation = 0.0;
+        self.projectiles.clear();
     }
 
     fn is_dead(self: *Self, now: f32) bool {
@@ -309,7 +326,9 @@ const Ship = struct {
 
     fn die(self: *Self, now: f32) void {
         self.death_time = now;
-        self.lives -= 1;
+        if (self.lives > 0) {
+            self.lives -= 1;
+        }
 
         if (sound != null) {
             rl.playSound(sound.?.asteroid.small);
@@ -324,16 +343,15 @@ const Ship = struct {
         return Vector2.init(math.cos(dir_angle), math.sin(dir_angle));
     }
 
-    const DRAG = 0.03;
-    fn update(self: *Self) void {
+    fn update(self: *Self, delta_time: f32, drag: f32) void {
         // Rotate left
         if (rl.isKeyDown(.a) or rl.isKeyDown(.left)) {
-            self.rotation -= Ship.ROTATION_SPEED * state.delta_time;
+            self.rotation -= Ship.ROTATION_SPEED * delta_time;
         }
 
         // Rotate right
         if (rl.isKeyDown(.d) or rl.isKeyDown(.right)) {
-            self.rotation += Ship.ROTATION_SPEED * state.delta_time;
+            self.rotation += Ship.ROTATION_SPEED * delta_time;
         }
 
         // Update move direction
@@ -343,7 +361,7 @@ const Ship = struct {
                 self.velocity,
                 rlm.vector2Scale(
                     ship_dir,
-                    Ship.SPEED * state.delta_time,
+                    Ship.SPEED * delta_time,
                 ),
             );
 
@@ -360,7 +378,7 @@ const Ship = struct {
         }
 
         // Add drag (resistance) to slow ship down over time
-        self.velocity = rlm.vector2Scale(self.velocity, 1 - DRAG);
+        self.velocity = rlm.vector2Scale(self.velocity, 1 - drag);
 
         // Update ship position
         self.position = rlm.vector2Add(self.position, self.velocity);
@@ -372,7 +390,7 @@ const Ship = struct {
         );
     }
 
-    fn drawn_points(self: *Self) std.BoundedArray(Vector2, 32) {
+    fn drawn_points(self: *const Self) std.BoundedArray(Vector2, 32) {
         return get_drawn_points(
             self.position,
             Line.SCALE,
@@ -381,7 +399,7 @@ const Ship = struct {
         );
     }
 
-    fn draw(self: *Self, booster: bool) void {
+    fn draw(self: *const Self, booster: bool) void {
         draw_lines(
             self.position,
             Line.SCALE,
@@ -400,6 +418,67 @@ const Ship = struct {
                 true,
                 true,
             );
+        }
+    }
+
+    const NUM_DEBRIS_LINES = 5;
+    const NUM_DEBRIS_DOTS = 20;
+    const NUM_DEBRIS_PARTICLES = NUM_DEBRIS_LINES + NUM_DEBRIS_DOTS;
+    fn debris(self: *const Self, rand: *const std.Random) [NUM_DEBRIS_PARTICLES]Particle {
+        const particles: [NUM_DEBRIS_PARTICLES]Particle = Particle.generate(
+            .LINE,
+            self.position,
+            rand,
+            NUM_DEBRIS_LINES,
+            null,
+        ) ++ Particle.generate(
+            .DOT,
+            self.position,
+            rand,
+            NUM_DEBRIS_DOTS,
+            null,
+        );
+        return particles;
+    }
+
+    fn check_collision_poly(self: *const Self, poly_points: []const Vector2) bool {
+        for (self.drawn_points().slice()) |point| {
+            // Collision detection based on https://jeffreythompson.org/collision-detection/poly-point.php
+            const collision = rl.checkCollisionPointPoly(
+                point,
+                poly_points,
+            );
+            // If collision found, end collision check and generate debris
+            if (collision) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn shoot(self: *Self) void {
+        if (self.projectiles.len == State.MAX_PROJECTILES) {
+            return;
+        }
+
+        state.ship.projectiles.append(Projectile{
+            .ttl = 1.5,
+            .position = rlm.vector2Add(
+                state.ship.position,
+                rlm.vector2Scale(
+                    state.ship.direction(),
+                    Line.SCALE * 0.55,
+                ),
+            ),
+            .velocity = rlm.vector2Scale(
+                state.ship.direction(),
+                5.0,
+            ),
+        }) catch unreachable;
+
+        // Play shoot sound if available
+        if (sound != null) {
+            rl.playSound(sound.?.ship.fire);
         }
     }
 };
@@ -439,8 +518,8 @@ const Asteroid = struct {
         fn score(self: Size) u32 {
             return switch (self) {
                 .Big => 20,
-                .Medium => 40,
-                .Small => 80,
+                .Medium => 50,
+                .Small => 100,
             };
         }
 
@@ -538,25 +617,55 @@ const Asteroid = struct {
             true,
         );
     }
+
+    const NUM_DEBRIS_DOTS = 12;
+    fn debris(self: *const Self, rand: *const std.Random) [NUM_DEBRIS_DOTS]Particle {
+        return Particle.generate(
+            .DOT,
+            self.position,
+            rand,
+            NUM_DEBRIS_DOTS,
+            null,
+        );
+    }
 };
 
 const Alien = struct {
     const POINTS = .{
-        // Tip of ship
-        Vector2.init(0.0, -0.62),
-        // Left wing of ship
-        Vector2.init(-0.42, 0.62),
-        // Left sub-wing of ship
-        Vector2.init(-0.21, 0.48),
-        // Right sub-wing of ship
-        Vector2.init(0.21, 0.48),
-        // Right wing of ship
-        Vector2.init(0.42, 0.62),
+        // Right base of saucer head
+        Vector2.init(0.2, -0.2),
+        // Right corner of saucer head
+        Vector2.init(0.1, -0.4),
+        // Left corner of saucer head
+        Vector2.init(-0.1, -0.4),
+        // Left base of saucer head
+        Vector2.init(-0.2, -0.2),
+        // Left corner of saucer body
+        Vector2.init(-0.3, -0.2),
+        // Left tip of saucer body
+        Vector2.init(-0.5, 0),
+        // Left corner of saucer body
+        Vector2.init(-0.3, 0.2),
+        // Right corner of saucer body
+        Vector2.init(0.3, 0.2),
+        // Right tip of saucer body
+        Vector2.init(0.5, 0),
+        // Right corner of saucer body
+        Vector2.init(0.3, -0.2),
+        // Left corner of saucer body
+        Vector2.init(-0.3, -0.2),
+        // Left tip of saucer body
+        Vector2.init(-0.5, 0),
+        // Right tip of saucer body
+        Vector2.init(0.5, 0),
     };
     size: Size,
     position: Vector2,
-    velocity: Vector2,
+    velocity: Vector2 = Vector2.init(0, 0),
     remove: bool = false,
+    last_shot: f32 = 0.0,
+    last_moved: f32 = 0.0,
+    projectiles: std.BoundedArray(Projectile, State.MAX_PROJECTILES),
 
     const Size = enum(u8) {
         Small = 0,
@@ -565,32 +674,24 @@ const Alien = struct {
         const Self = @This();
         fn size(self: Size) f32 {
             return switch (self) {
-                .Big => Line.SCALE * 3.69,
-                .Small => Line.SCALE * 0.69,
+                .Big => Line.SCALE * 2.5,
+                .Small => Line.SCALE * 1.5,
             };
         }
 
-        fn velocity(self: Size) f32 {
+        fn speed(self: Size) f32 {
             return switch (self) {
-                .Big => 0.32,
-                .Small => 1.5,
+                .Big => 1.5,
+                .Small => 3,
             };
         }
 
         // Score obtained from destroying asteroid of current size
         fn score(self: Size) u32 {
             return switch (self) {
-                .Big => 20,
-                .Small => 80,
+                .Big => 200,
+                .Small => 1000,
             };
-        }
-
-        // Max obtainable score from destroying asteroid of current size and all sizes smaller
-        fn total_score(self: Size) u32 {
-            if (self == .Small) {
-                return self.score();
-            }
-            return self.score() + (2 * total_score(@enumFromInt(@intFromEnum(self) - 1)));
         }
 
         fn play_sound(self: Size) ?rl.Sound {
@@ -602,10 +703,105 @@ const Alien = struct {
                 .Small => sound.?.saucer.small,
             };
         }
+
+        /// Interval between movement in seconds
+        fn move_interval(self: Size) f32 {
+            return switch (self) {
+                .Big => 3,
+                .Small => 1.5,
+            };
+        }
+
+        /// Interval between movement in seconds
+        fn shoot_interval(self: Size) f32 {
+            return switch (self) {
+                .Big => 5,
+                .Small => 2.5,
+            };
+        }
     };
 
     const Self = @This();
-    fn init() Self {}
+    fn init(position: Vector2, size: Alien.Size) Self {
+        const projectiles = std.BoundedArray(Projectile, State.MAX_PROJECTILES).init(0) catch unreachable;
+        return Self{
+            .position = position,
+            .size = size,
+            .projectiles = projectiles,
+        };
+    }
+
+    fn update(self: *Self, now: f32, _: f32, ship_pos: Vector2) void {
+        // Determine direction randomly
+        const can_move = (now - self.last_moved) > self.size.move_interval();
+        if (can_move) {
+            const angle = math.tau * state.rand.float(f32);
+            const dir = Vector2.init(math.cos(angle), math.sin(angle));
+            self.velocity = rlm.vector2Add(
+                self.velocity,
+                rlm.vector2Scale(
+                    dir,
+                    self.size.speed(),
+                ),
+            );
+            self.last_moved = now;
+        }
+
+        const can_shoot = (now - self.last_shot) > self.size.shoot_interval();
+        if (can_shoot) {
+            const dir = rlm.vector2Normalize(rlm.vector2Subtract(ship_pos, self.position));
+            const ttl = 3;
+            const projectile = Projectile{
+                .ttl = ttl,
+                .position = rlm.vector2Add(
+                    rlm.vector2Add(rlm.vector2Scale(dir, 5.0), self.position),
+                    rlm.vector2Scale(
+                        dir,
+                        Line.SCALE * 0.55,
+                    ),
+                ),
+                .velocity = rlm.vector2Scale(
+                    dir,
+                    3.0,
+                ),
+            };
+            self.projectiles.append(projectile) catch unreachable;
+            self.last_shot = now;
+
+            // Play shoot sound if available
+            if (sound != null) {
+                rl.playSound(sound.?.ship.fire);
+            }
+        }
+
+        // Add drag (resistance) to slow alien down over time
+        self.velocity = rlm.vector2Scale(self.velocity, 1 - State.DRAG);
+
+        // Update position
+        self.position = rlm.vector2Add(self.position, self.velocity);
+
+        // Handle ship position wrap-around in case alien goes off-screen
+        self.position = Vector2.init(
+            @mod(self.position.x, Window.WIDTH),
+            @mod(self.position.y, Window.HEIGHT),
+        );
+
+        // Play saucer sound if available
+        if (self.size.play_sound()) |saucer_sound| {
+            if (!rl.isSoundPlaying(saucer_sound)) {
+                rl.playSound(saucer_sound);
+            }
+        }
+    }
+
+    fn drawn_points(self: *const Self) std.BoundedArray(Vector2, 32) {
+        return get_drawn_points(
+            self.position,
+            self.size.size(),
+            0.0,
+            &Alien.POINTS,
+        );
+    }
 
     fn draw(self: *const Self) void {
         draw_lines(
@@ -613,9 +809,36 @@ const Alien = struct {
             self.size.size(),
             0.0,
             &Alien.POINTS,
-            true,
+            false,
             true,
         );
+    }
+
+    const NUM_DEBRIS_DOTS = 12;
+    fn debris(self: *Self, rand: *const std.Random) [NUM_DEBRIS_DOTS]Particle {
+        const particles: [NUM_DEBRIS_DOTS]Particle = Particle.generate(
+            .DOT,
+            self.position,
+            rand,
+            NUM_DEBRIS_DOTS,
+            null,
+        );
+        return particles;
+    }
+
+    fn check_collision_poly(self: *const Self, poly_points: []const Vector2) bool {
+        for (self.drawn_points().slice()) |point| {
+            // Collision detection based on https://jeffreythompson.org/collision-detection/poly-point.php
+            const collision = rl.checkCollisionPointPoly(
+                point,
+                poly_points,
+            );
+            // If collision found, end collision check and generate debris
+            if (collision) {
+                return true;
+            }
+        }
+        return false;
     }
 };
 
@@ -712,6 +935,10 @@ const Particle = struct {
         return particles;
     }
 
+    fn is_drawable(self: *const Self) bool {
+        return self.ttl > 0;
+    }
+
     fn draw(self: *const Self) void {
         switch (self.data) {
             .LINE => |line_data| {
@@ -740,12 +967,18 @@ const Particle = struct {
 
 const Projectile = struct {
     const RADIUS = @max(Line.SCALE * 0.05, 1);
+
     position: Vector2,
     velocity: Vector2 = Vector2.init(0, 0),
     ttl: f32,
     remove: bool = false,
 
     const Self = @This();
+
+    fn is_drawable(self: *const Self) bool {
+        return self.ttl > 0;
+    }
+
     fn draw(self: *const Self) void {
         rl.drawCircleV(
             self.position,
@@ -753,11 +986,44 @@ const Projectile = struct {
             rl.Color.white,
         );
     }
+
+    fn check_collision_poly(self: *const Self, poly_points: []const Vector2) bool {
+        for (0..poly_points.len) |j| {
+            const next_idx = (j + 1) % poly_points.len;
+            const p1 = poly_points[j];
+            const p2 = poly_points[next_idx];
+
+            // Check if projectile collided against side of polygon
+            //
+            // NOTE: this check is not foolproof and CAN miss out on
+            // collisions due to projectile moving past the side and
+            // INTO the asteroid within a single frame
+            const proj_collision = rl.checkCollisionCircleLine(
+                self.position,
+                Projectile.RADIUS,
+                p1,
+                p2,
+            );
+
+            // End projectile collision check if collision found
+            if (proj_collision) {
+                return true;
+            }
+        }
+
+        // Check if projectile is within polygon
+        const proj_within = rl.checkCollisionPointPoly(
+            self.position,
+            poly_points,
+        );
+
+        return proj_within;
+    }
 };
 
 fn get_drawn_points(origin: Vector2, scale: f32, rotation: f32, points: []const Vector2) std.BoundedArray(Vector2, 32) {
     var drawn_points = std.BoundedArray(Vector2, 32).init(0) catch |err| {
-        std.debug.print("get_drawn_points: failed to init drawn_points bounded array {any}", .{err});
+        std.log.err("get_drawn_points: failed to init drawn_points bounded array {any}", .{err});
         return .{};
     };
 
@@ -776,7 +1042,7 @@ fn get_drawn_points(origin: Vector2, scale: f32, rotation: f32, points: []const 
         );
 
         drawn_points.append(currDrawn) catch |err| {
-            std.debug.print("get_drawn_points: failed to add drawing point to bounded array due to overflow {any}", .{err});
+            std.log.err("get_drawn_points: failed to add drawing point to bounded array due to overflow {any}", .{err});
             continue;
         };
     }
@@ -790,7 +1056,7 @@ fn draw_lines(origin: Vector2, scale: f32, rotation: f32, points: []const Vector
     var clone_y: i32 = 0;
 
     var drawn_points = std.BoundedArray(Vector2, 32).init(0) catch |err| {
-        std.debug.print("draw_lines: failed to init drawn_points bounded array {any}", .{err});
+        std.log.err("draw_lines: failed to init drawn_points bounded array {any}", .{err});
         return;
     };
 
@@ -809,7 +1075,7 @@ fn draw_lines(origin: Vector2, scale: f32, rotation: f32, points: []const Vector
         );
 
         drawn_points.append(currDrawn) catch |err| {
-            std.debug.print("draw_lines: failed to add drawing point to bounded array due to overflow {any}", .{err});
+            std.log.err("draw_lines: failed to add drawing point to bounded array due to overflow {any}", .{err});
             continue;
         };
 
@@ -893,128 +1159,149 @@ fn update() void {
 
     state.delta_time = rl.getFrameTime();
     state.now += state.delta_time;
-    defer state.frame += 1;
 
     // Update ship position state
     if (!state.ship.is_dead(state.now)) {
-        state.ship.update();
+        state.ship.update(state.delta_time, State.DRAG);
 
-        // Generate projectiles if projectile available
-        if (rl.isKeyPressed(.space) and state.projectiles.len < State.MAX_PROJECTILES) {
-            if (sound != null) {
-                rl.playSound(sound.?.ship.fire);
+        // Handle ship vs alien projectile collision
+        outer: for (state.aliens.slice()) |*alien| {
+            for (alien.projectiles.slice()) |*proj| {
+                // Ignore destroyed projectiles
+                if (proj.remove) {
+                    continue;
+                }
+                const proj_ship_collided = proj.check_collision_poly(state.ship.drawn_points().slice());
+                if (proj_ship_collided) {
+                    std.debug.print("proj_ship_collided, projectile_pos: {any}, ship_pos: {any}\n", .{ proj.position, state.ship.position });
+                    state.ship.die(state.now);
+                    proj.remove = true;
+                    state.particles.appendSlice(&state.ship.debris(state.rand)) catch unreachable;
+                    break :outer;
+                }
             }
-            const ttl = 1.5;
-            const projectile = Projectile{
-                .ttl = ttl,
-                .position = rlm.vector2Add(
-                    state.ship.position,
-                    rlm.vector2Scale(
-                        state.ship.direction(),
-                        Line.SCALE * 0.55,
-                    ),
-                ),
-                .velocity = rlm.vector2Scale(
-                    state.ship.direction(),
-                    5.0,
-                ),
-            };
-            state.projectiles.append(projectile) catch unreachable;
+        }
+    }
+
+    // Handle shooting
+    if (!state.ship.is_dead(state.now) and rl.isKeyPressed(.space)) {
+        state.ship.shoot();
+    }
+
+    // Handle aliens state
+    {
+        var i: usize = 0;
+        while (i < state.aliens.len) {
+            var alien: *Alien = &state.aliens.slice()[i];
+            const alien_drawn_points = alien.drawn_points();
+
+            // Handle alien vs ship collision
+            if (!state.ship.is_dead(state.now)) {
+                const collided = state.ship.check_collision_poly(alien_drawn_points.slice());
+                if (collided) {
+                    alien.remove = true;
+                    std.debug.print("alien_ship_collided\n", .{});
+                    state.ship.die(state.now);
+                    break;
+                }
+            }
+
+            // Handle alien vs projectile collision
+            if (!alien.remove) {
+                for (state.ship.projectiles.slice()) |*proj| {
+                    // Ignore destroyed projectiles
+                    if (proj.remove) {
+                        continue;
+                    }
+                    const proj_alien_collided = proj.check_collision_poly(alien_drawn_points.slice());
+                    if (proj_alien_collided) {
+                        alien.remove = true;
+                        proj.remove = true;
+                        break;
+                    }
+                }
+            }
+
+            // Generate alien debris
+            if (alien.remove) {
+                state.particles.appendSlice(&alien.debris(state.rand)) catch unreachable;
+                _ = state.aliens.swapRemove(i);
+                continue;
+            }
+
+            // Update alien position if no collisions found
+            alien.update(state.now, state.delta_time, state.ship.position);
+            i += 1;
         }
     }
 
     // Handle asteroids state
     {
-        const ship_drawn_points = state.ship.drawn_points();
         var i: usize = 0;
         while (i < state.asteroids.len) {
             var asteroid: *Asteroid = &state.asteroids.slice()[i];
+            const asteroid_drawn_points = asteroid.drawn_points();
 
             // Handle asteroid vs ship collision
             if (!state.ship.is_dead(state.now)) {
-                const asteroid_drawn_points = asteroid.drawn_points();
-                for (ship_drawn_points.slice()) |point| {
-                    // Collision detection based on https://jeffreythompson.org/collision-detection/poly-point.php
-                    const ship_collision = rl.checkCollisionPointPoly(
-                        point,
-                        asteroid_drawn_points.slice(),
-                    );
-
-                    // End asteroid collision check if collision found and ship is dead,
-                    // generate ship debris particles if dead
-                    if (ship_collision) {
-                        state.ship.die(state.now);
-                        const lines = Particle.generate(
-                            .LINE,
-                            state.ship.position,
-                            state.rand,
-                            5,
-                            null,
-                        );
-                        const dots = Particle.generate(
-                            .DOT,
-                            state.ship.position,
-                            state.rand,
-                            20,
-                            null,
-                        );
-                        state.particles.appendSlice(&lines) catch unreachable;
-                        state.particles.appendSlice(&dots) catch unreachable;
-                        break;
-                    }
+                const ship_collided = state.ship.check_collision_poly(asteroid_drawn_points.slice());
+                if (ship_collided) {
+                    state.ship.die(state.now);
+                    state.particles.appendSlice(&state.ship.debris(state.rand)) catch unreachable;
                 }
             }
 
-            // Handle asteroid vs projectile collision
-            const asteroid_drawn_points = asteroid.drawn_points();
-            for (state.projectiles.slice()) |*proj| {
+            // Handle asteroid vs aliens collision
+            for (state.aliens.slice()) |*alien| {
+                // Ignore destroyed aliens
+                if (alien.remove) {
+                    continue;
+                }
+                const alien_collided = alien.check_collision_poly(asteroid_drawn_points.slice());
+                if (alien_collided) {
+                    alien.remove = true;
+                }
+            }
+
+            // Handle asteroid vs ship projectile collision
+            for (state.ship.projectiles.slice()) |*proj| {
                 // Ignore destroyed projectiles
                 if (proj.remove) {
                     continue;
                 }
 
-                for (0..asteroid_drawn_points.len) |j| {
-                    const next_idx = (j + 1) % asteroid_drawn_points.len;
-                    const p1 = asteroid_drawn_points.slice()[j];
-                    const p2 = asteroid_drawn_points.slice()[next_idx];
-
-                    // Check if projectile collided against side of asteroid
-                    //
-                    // NOTE: this check is not foolproof and CAN miss out on
-                    // collisions due to projectile moving past the side and
-                    // INTO the asteroid within a single frame
-                    const proj_collision = rl.checkCollisionCircleLine(
-                        proj.position,
-                        Projectile.RADIUS,
-                        p1,
-                        p2,
+                const proj_asteroid_collided = proj.check_collision_poly(asteroid_drawn_points.slice());
+                if (proj_asteroid_collided) {
+                    // Handle destroying asteroid
+                    const impact = rlm.vector2Scale(
+                        rlm.vector2Normalize(proj.velocity),
+                        0.5,
                     );
-
-                    // End projectile collision check if collision found and asteroid is destroyed
-                    if (proj_collision) {
-                        asteroid.remove = true;
-                        proj.remove = true;
-                        break;
-                    }
-                }
-
-                // Check if projectile is within asteroid
-                const proj_within = rl.checkCollisionPointPoly(
-                    proj.position,
-                    asteroid_drawn_points.slice(),
-                );
-
-                if (proj_within) {
+                    handleAsteroidCollision(asteroid, impact);
                     asteroid.remove = true;
                     proj.remove = true;
-                }
-
-                // End projectile collision check if collided
-                // Handle destroying asteroid
-                if (asteroid.remove) {
-                    const impact = rlm.vector2Scale(rlm.vector2Normalize(proj.velocity), 0.5);
-                    handleAsteroidCollision(asteroid, impact);
                     break;
+                }
+            }
+
+            // Handle asteroid vs alien projectile collision
+            outer: for (state.aliens.slice()) |*alien| {
+                for (alien.projectiles.slice()) |*proj| {
+                    if (proj.remove) {
+                        continue;
+                    }
+                    const proj_asteroid_collided = proj.check_collision_poly(asteroid_drawn_points.slice());
+                    if (proj_asteroid_collided) {
+                        // Handle destroying asteroid
+                        const impact = rlm.vector2Scale(
+                            rlm.vector2Normalize(proj.velocity),
+                            0.5,
+                        );
+                        handleAsteroidCollision(asteroid, impact);
+                        asteroid.remove = true;
+                        proj.remove = true;
+                        break :outer;
+                    }
                 }
             }
 
@@ -1035,10 +1322,7 @@ fn update() void {
             }
 
             // Update asteroid position if no collisions found
-            asteroid.position = rlm.vector2Add(
-                asteroid.position,
-                asteroid.velocity,
-            );
+            asteroid.position = rlm.vector2Add(asteroid.position, asteroid.velocity);
             asteroid.position = Vector2.init(
                 @mod(asteroid.position.x, Window.WIDTH),
                 @mod(asteroid.position.y, Window.HEIGHT),
@@ -1074,16 +1358,16 @@ fn update() void {
         }
     }
 
-    // Handle projectile state
+    // Handle ship projectile state
     {
         var i: usize = 0;
-        while (i < state.projectiles.len) {
-            var projectile: *Projectile = &state.projectiles.slice()[i];
+        while (i < state.ship.projectiles.len) {
+            var projectile: *Projectile = &state.ship.projectiles.slice()[i];
 
             // Remove expired projectiles
             projectile.ttl -= state.delta_time;
             if (projectile.remove or projectile.ttl < state.delta_time) {
-                _ = state.projectiles.swapRemove(i);
+                _ = state.ship.projectiles.swapRemove(i);
                 continue;
             }
 
@@ -1098,6 +1382,35 @@ fn update() void {
             );
 
             i += 1;
+        }
+    }
+
+    // Handle aliens projectile state
+    {
+        for (state.aliens.slice()) |*alien| {
+            var i: usize = 0;
+            while (i < alien.projectiles.len) {
+                var projectile: *Projectile = &alien.projectiles.slice()[i];
+
+                // Remove expired projectiles
+                projectile.ttl -= state.delta_time;
+                if (projectile.remove or projectile.ttl < state.delta_time) {
+                    _ = alien.projectiles.swapRemove(i);
+                    continue;
+                }
+
+                // Update positions of live projectiles
+                projectile.position = rlm.vector2Add(
+                    projectile.position,
+                    projectile.velocity,
+                );
+                projectile.position = Vector2.init(
+                    @mod(projectile.position.x, Window.WIDTH),
+                    @mod(projectile.position.y, Window.HEIGHT),
+                );
+
+                i += 1;
+            }
         }
     }
 
@@ -1117,20 +1430,32 @@ fn update() void {
     }
 
     // Play background beat
+    // Current method is incrementally halving the initial interval based on progress
+    // Incremental rate is calculated via a sigmoid curve on the progress level
+    // NOTE: an alternative would be to map interval of beats to progress percentage
     if (!state.ship.is_dead(state.now) and sound != null) {
-        const max_interval: usize = @intFromFloat(Window.FPS * 3);
-        const max_interval_log: u32 = math.log2_int(u32, max_interval) - 1;
-        // Output frequency of background beat based on progress of current level
-        // Progress of current level is calculated via `current score / level max score`
+        const max_interval_ms: u32 = 3000;
+
+        // Max. number of times we can halve the interval is `log2(largest interval)`
+        // Cap to 6, since any less will be ignored (interval will be too short)
+        const max_interval_log: f32 = @min(math.log2(@as(f32, @floatFromInt(max_interval_ms))), 6.0);
+
+        // Calculate increment rate via sigmoid scale
         const current_progress: f32 = (@as(f32, @floatFromInt(state.level.score)) / @as(f32, @floatFromInt(state.level.max_score)));
-        const value = sigmoid_scale(current_progress, 0, max_interval_log, 5);
-        const frame_interval: usize = @max(5, max_interval >> @intCast(value));
-        // Only play beat every `frame_interval` frames
-        if (@mod(state.frame, frame_interval) == 0) {
+        const value = sigmoid_scale(current_progress, 0, @as(u32, @intFromFloat(max_interval_log)), 10);
+
+        // Repeatedly half the interval the closer the progress is to completion
+        const interval_ms: f32 = @floatFromInt(@max(50, max_interval_ms >> @intCast(value)));
+        const interval_sec: f32 = interval_ms / 1000;
+        const last_played_interval: f32 = state.now - state.last_beat_time;
+
+        // Only play beat every `ms_interval` frames
+        // NOTE: we track beat time instead of remain fps-agnostic
+        if (last_played_interval > interval_sec) {
             const beat = if (state.prev_beat_idx == 0) sound.?.beat.first else sound.?.beat.second;
             state.prev_beat_idx = @mod(state.prev_beat_idx + 1, 2);
-            state.frame = 0;
             rl.playSound(beat);
+            state.last_beat_time = state.now;
         }
     }
 }
@@ -1154,24 +1479,15 @@ fn sigmoid_scale(ratio: f32, min: u32, max: u32, steepness: ?u32) u32 {
 }
 
 fn handleAsteroidCollision(asteroid: *Asteroid, impact: Vector2) void {
+    // Generate debris
+    state.particles.appendSlice(&asteroid.debris(state.rand)) catch unreachable;
+
+    // Generate smaller asteroids
     const nextSize: ?Asteroid.Size = switch (asteroid.size) {
         .Big => .Medium,
         .Medium => .Small,
         .Small => null,
     };
-
-    // Generate debris
-    state.particles.appendSlice(
-        &Particle.generate(
-            .DOT,
-            asteroid.position,
-            state.rand,
-            12,
-            null,
-        ),
-    ) catch unreachable;
-
-    // Generate smaller asteroids
     if (nextSize != null) {
         for (0..2) |_| {
             const dir = rlm.vector2Normalize(asteroid.velocity);
@@ -1322,6 +1638,13 @@ fn render() void {
         state.ship.draw(booster);
     }
 
+    // Draw ship projectiles
+    for (state.ship.projectiles.slice()) |*proj| {
+        if (proj.is_drawable()) {
+            proj.draw();
+        }
+    }
+
     // Draw asteroids
     for (state.asteroids.slice()) |*asteroid| {
         asteroid.draw();
@@ -1329,14 +1652,19 @@ fn render() void {
 
     // Draw particles
     for (state.particles.slice()) |*particle| {
-        if (particle.ttl > 0) {
+        if (particle.is_drawable()) {
             particle.draw();
         }
     }
 
-    // Draw particles
-    for (state.projectiles.slice()) |*proj| {
-        proj.draw();
+    // Draw alien projectiles
+    for (state.aliens.slice()) |*alien| {
+        alien.draw();
+        for (alien.projectiles.slice()) |*proj| {
+            if (proj.is_drawable()) {
+                proj.draw();
+            }
+        }
     }
 }
 
